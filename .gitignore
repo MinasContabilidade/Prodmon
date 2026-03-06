@@ -1,0 +1,22 @@
+# Ambiente virtual Python
+.venv/
+venv/
+env/
+
+# Dados locais gerados pelo agente (não versionar)
+data/
+logs/
+*.pid
+
+# Arquivos de cache Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+desktop.ini
