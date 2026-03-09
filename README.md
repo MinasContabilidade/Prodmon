@@ -1,4 +1,4 @@
-# ProdMon Agent v1.2
+# ProdMon Agent v1.3
 ### Monitor de Produtividade Silencioso — Windows 10/11
 
 ---
@@ -36,28 +36,29 @@ Após sync bem-sucedido, o arquivo local do dia anterior é apagado.
 
 ---
 
-## Referência de Configurações (`config.ini`)
+## Referência de Configurações (`config.py`)
 
-O arquivo `config.ini` é dividido em **dois escopos** de responsabilidade:
+O arquivo `config.py` é dividido em **dois escopos** de responsabilidade:
 
 ---
 
 ### 🏢 Configurações do Escritório Contábil
 > Definidas **uma única vez** pelo administrador/TI antes de distribuir para as máquinas.
-> Todas as máquinas devem receber o mesmo `config.ini` base (exceto `local_dir` se necessário).
+> Todas as máquinas devem receber o mesmo `config.py` base (exceto `local_dir` se necessário).
 
 | Parâmetro | Seção | Padrão | Descrição |
 |-----------|-------|--------|-----------|
+| `operator_name` | `[user]` | *(preenchido no install)* | Nome do operador desta máquina — identifica a pessoa nos relatórios de produtividade |
 | `network_dir` | `[paths]` | *(obrigatório)* | Caminho da pasta de rede onde os JSONs de todas as máquinas são centralizados. Ex: `\\SERVIDOR\TI\ProdMon` ou `Z:\ProdMon` |
 | `sync_interval_minutes` | `[settings]` | `60` | De quantos em quantos minutos o agente sincroniza com a rede. Recomendado: 30–60 min |
-| `idle_threshold_minutes` | `[settings]` | `10` | ⚠️ **Deve ser igual ao tempo de apagar tela do Windows.** Veja seção abaixo. |
+| `idle_threshold_minutes` | `[settings]` | `5` | ⚠️ **Configurado automaticamente no Windows durante a instalação.** Veja seção abaixo. |
 | `autostart` | `[install]` | `true` | `true` = agente sobe automaticamente no login. `false` = iniciar via launcher |
 
 ---
 
 ### ⏱️ Como funciona a detecção de ausência
 
-O agente usa **dois mecanismos complementares** para capturar com precisão quando o colaborador está ou não trabalhando:
+O agente usa **três mecanismos complementares** para capturar com precisão quando o colaborador está ou não trabalhando:
 
 #### Modo 1 — Bloqueio de tela (Win+L, screensaver com senha)
 > Captura instantânea via evento do Windows (`WM_WTSSESSION_CHANGE`)
@@ -78,8 +79,16 @@ O agente detecta que ninguém usou o mouse/teclado por `idle_threshold_minutes` 
 
 > **⚠️ Regra de ouro:** `idle_threshold_minutes` deve ser igual ao tempo configurado em:
 > **Configurações → Sistema → Energia e suspensão → Tela: desligar após X minutos**
+> *(O `install.bat` configura isso automaticamente via `powercfg`)*
 
 Isso garante que o monitor e o agente "concordem" sobre quando o usuário está ausente.
+
+---
+
+#### Modo 3 — Polling de sessão (fallback redundante)
+> Detecção por verificação periódica do estado do desktop via `OpenInputDesktop`
+
+Caso o `pywin32` não esteja disponível (e portanto o Modo 1 não funcione), o agente verifica a cada `check_interval_seconds` se a tela está bloqueada. Funciona automaticamente como redundância — sem necessidade de configuração.
 
 **Exemplos práticos:**
 
@@ -90,7 +99,10 @@ Isso garante que o monitor e o agente "concordem" sobre quando o usuário está 
 | 15 minutos | `15` | Mais tolerante a pausas curtas |
 
 ```ini
-; ── Exemplo de config.ini para o escritório ──────────────────────────────────
+; ── Exemplo de config.py para o escritório ──────────────────────────────────
+[user]
+operator_name = João Silva        ; preenchido automaticamente durante a instalação
+
 [install]
 autostart = true              ; inicia automaticamente no login (recomendado)
 
@@ -98,7 +110,7 @@ autostart = true              ; inicia automaticamente no login (recomendado)
 network_dir = \\SERVIDOR\TI\ProdMon   ; ← ALTERE para o caminho real da rede
 
 [settings]
-idle_threshold_minutes = 10   ; deve coincidir com standby de tela do Windows
+idle_threshold_minutes = 5    ; tempo de espera de tela — configurado automaticamente (powercfg)
 sync_interval_minutes  = 60   ; sincronizar a cada hora
 ```
 
@@ -106,7 +118,7 @@ sync_interval_minutes  = 60   ; sincronizar a cada hora
 
 ### 💻 Configurações por Máquina
 > Ajustadas individualmente conforme o ambiente de cada estação de trabalho.
-> Não sobrescreva uma máquina já instalada — o `install.bat` preserva o `config.ini` existente.
+> Não sobrescreva uma máquina já instalada — o `install.bat` preserva o `config.py` existente.
 
 | Parâmetro | Seção | Padrão | Quando ajustar |
 |-----------|-------|--------|----------------|
@@ -128,9 +140,14 @@ debug_mode = false                    ; true apenas para diagnóstico temporári
 
 ---
 
-### 📋 `config.ini` completo comentado
+### 📋 `config.py` completo comentado
 
 ```ini
+[user]
+# Nome do operador desta máquina (preenchido durante a instalação)
+# Usado para identificar a pessoa nos relatórios e logs de produtividade
+operator_name = 
+
 [install]
 # true  = registra no startup do Windows (HKLM\...\Run) — inicia no login
 # false = não registra; cria start_prodmon.vbs para iniciar manualmente
@@ -146,8 +163,8 @@ network_dir = \\SERVIDOR\TI\ProdMon
 
 [settings]
 # Minutos sem mouse/teclado para marcar período como ocioso
-# DEVE coincidir com o tempo de standby de tela do Windows (recomendado: 10)
-idle_threshold_minutes = 10
+# Configurado automaticamente no Windows durante a instalação (powercfg)
+idle_threshold_minutes = 5
 
 # Intervalo de sincronização com a pasta de rede (em minutos)
 sync_interval_minutes = 60
@@ -172,15 +189,16 @@ debug_mode = false
 Coloque em qualquer pasta temporária (ex: Área de Trabalho):
 ```
 prodmon_agent.py
-config.ini
+config.py
 install.bat
 uninstall.bat
 requirements.txt
 ```
 
-### 2. Editar o `config.ini`
+### 2. Editar o `config.py`
 
 Defina o caminho da pasta de rede em `network_dir` e escolha o modo de `autostart`.
+(O `operator_name` será preenchido durante a instalação.)
 
 ### 3. Executar o instalador como Administrador
 
@@ -188,17 +206,21 @@ Clique com botão direito em `install.bat` → **Executar como administrador**
 
 O instalador irá:
 - Copiar os arquivos para `C:\ProgramData\ProdMon` (pasta oculta)
+- Perguntar o **nome do operador** da máquina
+- Gravar o nome do operador no `config.py`
 - Instalar `pywin32` via pip
-- Restringir permissões do `config.ini` a Administradores (via `icacls`)
+- Restringir permissões do `config.py` (Admins escrevem, Users apenas leem — via `icacls`)
+- Configurar automaticamente o **timeout de tela** do Windows (via `powercfg`)
 - **Se `autostart = true`:** registrar o agente em `HKLM\...\Run\ProdMonAgent`
 - **Se `autostart = false`:** criar o arquivo `start_prodmon.vbs` e um atalho na Área de Trabalho para iniciar manualmente
 - Iniciar o agente imediatamente
 
 ### 4. Configurar o standby do monitor
 
-Para que a ociosidade seja apurada corretamente, configure o Windows para apagar a tela após **10 minutos**:
+Para que a ociosidade seja apurada corretamente, o `install.bat` **configura automaticamente** o timeout de tela do Windows para coincidir com `idle_threshold_minutes`.
 
-> Configurações → Sistema → Energia e suspensão → **Tela: 10 minutos**
+> ⚠️ Se precisar alterar manualmente:
+> Configurações → Sistema → Energia e suspensão → **Tela: X minutos**
 
 ---
 
@@ -223,7 +245,7 @@ Basta **clicar duas vezes** em qualquer um deles para iniciar o agente silencios
 
 ## Debug Visual (cronômetro ao vivo)
 
-Para verificar se o agente está funcionando corretamente, ative o modo debug no `config.ini`:
+Para verificar se o agente está funcionando corretamente, ative o modo debug no `config.py`:
 
 ```ini
 [debug]
@@ -253,7 +275,7 @@ Uma pequena janela aparece no **canto inferior direito** da tela, sempre visíve
 ```
 C:\ProgramData\ProdMon\          ← pasta oculta (+h +s)
 ├── prodmon_agent.py
-├── config.ini                   ← acesso restrito a Administradores
+├── config.py                    ← leitura por Users, escrita só por Admins
 ├── prodmon.pid                  ← PID do processo (usado pelo uninstall)
 ├── start_prodmon.vbs            ← launcher manual (se autostart = false)
 ├── data\
@@ -280,10 +302,11 @@ C:\ProgramData\ProdMon\          ← pasta oculta (+h +s)
 
 ```json
 {
-  "machine":  "PC-JOAO",
-  "username": "joao.silva",
-  "date":     "2025-01-15",
-  "version":  "1.2",
+  "machine":       "PC-JOAO",
+  "operator_name": "João Silva",
+  "username":      "joao.silva",
+  "date":          "2025-01-15",
+  "version":       "1.3",
   "events": [
     { "type": "boot",     "timestamp": "2025-01-15T08:00:12" },
     { "type": "active",  "start": "2025-01-15T08:00:15", "end": "2025-01-15T12:00:00", "duration_seconds": 14385 },
@@ -318,7 +341,8 @@ import json, pathlib
 data = json.loads(pathlib.Path("PC-JOAO_2025-01-15.json").read_text())
 s = data["summary"]
 
-print(f"Usuário        : {data['username']} @ {data['machine']}")
+print(f"Operador       : {data['operator_name']}")
+print(f"Máquina        : {data['machine']} ({data['username']})")
 print(f"Entrada        : {s['session_start'][11:16]}")
 print(f"Saída          : {s['session_end'][11:16]}" if s['session_end'] else "Em andamento")
 print(f"Horas ativas   : {s['active_seconds'] / 3600:.2f}h")
@@ -343,7 +367,10 @@ print(f"Horas bloqueado: {s['locked_seconds'] / 3600:.2f}h")
 ## Desinstalação
 
 Execute `uninstall.bat` como Administrador.
-Ele encerrará o processo, removerá a entrada do startup (se existir) e (opcionalmente) apagará os dados locais.
+Ele irá:
+- Encerrar o processo pelo PID salvo (ou buscar especificamente o `prodmon_agent` via `wmic`)
+- Remover a entrada do startup (`HKLM\...\Run\ProdMonAgent`)
+- Perguntar se deseja apagar todos os dados locais
 
 ---
 
@@ -352,7 +379,11 @@ Ele encerrará o processo, removerá a entrada do startup (se existir) e (opcion
 - O agente **não captura conteúdo** digitado (teclas, textos) — apenas detecta se houve atividade ou não
 - O agente **não captura screenshots**
 - Os dados são armazenados apenas localmente e na pasta de rede configurada
-- O `config.ini` tem acesso restrito a Administradores (via `icacls`) — usuários padrão não podem alterar o destino de sync
+- O `config.py` tem ACL restritiva: Admins e SYSTEM têm controle total, usuários comuns apenas leitura
+- O nome do operador é **sanitizado** durante a instalação (caracteres perigosos removidos)
+- Os dados JSON são gravados de forma **atômica** (via arquivo temporário + `os.replace`) para evitar corrupção por queda de energia
+- Proteção contra **múltiplas instâncias**: o agente verifica o PID existente e não inicia se outro já estiver rodando
+- O `uninstall.bat` encerra apenas o processo ProdMon (busca específica via `wmic`), sem afetar outros scripts Python
 
 ---
 
@@ -380,7 +411,7 @@ taskkill /pid <PID> /f
 ```
 
 **Testar o debug visual:**
-1. Edite `config.ini` e defina `debug_mode = true`
+1. Edite `config.py` e defina `debug_mode = true`
 2. Execute: `python C:\ProgramData\ProdMon\prodmon_agent.py`
 3. A janela de debug aparecerá no canto inferior direito
 
@@ -399,8 +430,9 @@ taskkill /pid <PID> /f
 
 | Versão | Data | Mudanças |
 |--------|------|----------|
-| 1.2 | Mar/2026 | Detecção de lock/unlock de sessão em tempo real (`WM_WTSSESSION_CHANGE`); campo `username` no JSON; campos `session_start`, `session_end`, `locked_seconds` no summary; estado `locked` na overlay de debug (azul); retrocompatibilidade com arquivos v1.1 |
-| 1.1 | Mar/2026 | `GetTickCount64`; `RotatingFileHandler`; thread-safety; ACL no config.ini; Debug Overlay tkinter; flag `autostart`; launcher VBS |
+| 1.3 | Mar/2026 | Auditoria de segurança: escrita atômica do JSON; proteção contra múltiplas instâncias; sanitização do input de operador; ACL corrigida (`Users:R`); sync always-copy (sem comparação falha por tamanho); detecção de lock por polling como fallback; `uninstall.bat` corrigido (`REG_NAME`, `EnableDelayedExpansion`, kill seletivo via `wmic`); thread-safety no overlay de debug |
+| 1.2 | Mar/2026 | Detecção de lock/unlock de sessão em tempo real (`WM_WTSSESSION_CHANGE`); campo `operator_name` e `username` no JSON; timeout de tela automático (`powercfg`); renomear config para `.py`; campos `session_start`, `session_end`, `locked_seconds` no summary; estado `locked` na overlay de debug (azul); retrocompatibilidade com arquivos v1.1 |
+| 1.1 | Mar/2026 | `GetTickCount64`; `RotatingFileHandler`; thread-safety; ACL no config.py; Debug Overlay tkinter; flag `autostart`; launcher VBS |
 | 1.0 | —       | Versão inicial |
 
 ---

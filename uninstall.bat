@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 :: ============================================================
 ::  ProdMon Agent - Desinstalacao
@@ -8,7 +8,7 @@ setlocal
 
 set "PRODMON_DIR=C:\ProgramData\ProdMon"
 set "REG_KEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-set "REG_NAME=SvcHostSysMonitor"
+set "REG_NAME=ProdMonAgent"
 
 echo.
 echo  ============================================================
@@ -30,8 +30,12 @@ if exist "%PID_FILE%" (
     taskkill /pid !AGENT_PID! /f >nul 2>&1
     timeout /t 2 >nul
 ) else (
-    echo  [..] Arquivo PID nao encontrado, tentando matar pythonw.exe...
-    taskkill /f /im pythonw.exe >nul 2>&1
+    echo  [..] Arquivo PID nao encontrado, buscando processo prodmon_agent...
+    for /f "tokens=2 delims==" %%p in ('wmic process where "name='pythonw.exe' and commandline like '%%prodmon_agent%%'" get processid /value 2^>nul ^| findstr ProcessId') do (
+        echo  [..] Encontrado ProdMon (PID: %%p), encerrando...
+        taskkill /pid %%p /f >nul 2>&1
+    )
+    timeout /t 2 >nul
 )
 
 :: ── Remover entrada de startup ────────────────────────────────

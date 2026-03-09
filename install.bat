@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 :: ============================================================
-::  ProdMon Agent v1.1 - Script de Instalacao
+::  ProdMon Agent v1.3 - Script de Instalacao
 ::  Execute como Administrador
 :: ============================================================
 
@@ -25,9 +25,9 @@ if %errorLevel% neq 0 (
     pause & exit /b 1
 )
 
-:: ── Ler opcao autostart do config.ini ─────────────────────────
+:: ── Ler opcao autostart do config.py ──────────────────────────
 set "AUTOSTART=true"
-for /f "tokens=1,* delims==" %%a in ('findstr /i "^autostart" "%SCRIPT_DIR%config.ini" 2^>nul') do (
+for /f "tokens=1,* delims==" %%a in ('findstr /i "^autostart" "%SCRIPT_DIR%config.py" 2^>nul') do (
     set "AUTOSTART_RAW=%%b"
 )
 if defined AUTOSTART_RAW (
@@ -35,6 +35,28 @@ if defined AUTOSTART_RAW (
     for /f "tokens=*" %%v in ("!AUTOSTART_RAW!") do set "AUTOSTART=%%v"
 )
 echo  [OK] autostart = %AUTOSTART%
+
+:: ── Ler idle_threshold_minutes do config.py ──────────────────
+set "IDLE_MINUTES=5"
+for /f "tokens=1,* delims==" %%a in ('findstr /i "^idle_threshold_minutes" "%SCRIPT_DIR%config.py" 2^>nul') do (
+    set "IDLE_RAW=%%b"
+)
+if defined IDLE_RAW (
+    for /f "tokens=*" %%v in ("!IDLE_RAW!") do set "IDLE_MINUTES=%%v"
+)
+echo  [OK] idle_threshold_minutes = %IDLE_MINUTES%
+
+:: ── Perguntar nome do operador ─────────────────────────────────
+echo.
+echo  Identificacao do operador desta maquina.
+echo  (Este nome aparecera nos relatorios de produtividade)
+echo.
+set /p "OPERATOR_NAME=  Nome do operador: "
+if not defined OPERATOR_NAME (
+    set "OPERATOR_NAME=Nao informado"
+)
+echo  [OK] Operador: !OPERATOR_NAME!
+echo.
 
 :: ── Localizar pythonw.exe ─────────────────────────────────────
 for /f "delims=" %%i in ('where pythonw.exe 2^>nul') do (
@@ -75,20 +97,40 @@ if not exist "%SCRIPT_DIR%prodmon_agent.py" (
 )
 copy /Y "%SCRIPT_DIR%prodmon_agent.py" "%PRODMON_DIR%\prodmon_agent.py" >nul
 
-:: config.ini: nao sobrescreve se ja existir (preserva configuracoes)
-if not exist "%PRODMON_DIR%\config.ini" (
-    copy /Y "%SCRIPT_DIR%config.ini" "%PRODMON_DIR%\config.ini" >nul
-    echo  [OK] config.ini copiado. Configure o caminho de rede antes de usar!
+:: config.py: nao sobrescreve se ja existir (preserva configuracoes)
+if not exist "%PRODMON_DIR%\config.py" (
+    copy /Y "%SCRIPT_DIR%config.py" "%PRODMON_DIR%\config.py" >nul
+    echo  [OK] config.py copiado. Configure o caminho de rede antes de usar!
 ) else (
-    echo  [OK] config.ini ja existe - mantido sem alteracoes.
+    echo  [OK] config.py ja existe - mantido sem alteracoes.
 )
 
-:: ── Proteger config.ini (somente Admins e SYSTEM podem ler/alterar) ──────────
-icacls "%PRODMON_DIR%\config.ini" /inheritance:r /grant:r "SYSTEM:(F)" "Administrators:(F)" >nul 2>&1
+:: ── Gravar operator_name no config.py instalado ──────────────────
+echo  [..] Gravando nome do operador no config.py...
+set "CFG_FILE=%PRODMON_DIR%\config.py"
+:: Sanitiza o nome do operador (remove caracteres perigosos para scripts)
+set "SAFE_NAME=!OPERATOR_NAME!"
+set "SAFE_NAME=!SAFE_NAME:'=!"
+set "SAFE_NAME=!SAFE_NAME:"=!"
+set "SAFE_NAME=!SAFE_NAME:&=!"
+set "SAFE_NAME=!SAFE_NAME:|=!"
+set "SAFE_NAME=!SAFE_NAME:>=!"
+set "SAFE_NAME=!SAFE_NAME:<=!"
+set "SAFE_NAME=!SAFE_NAME:;=!"
+:: Usa PowerShell para substituir a linha operator_name no arquivo
+powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^operator_name\s*=.*', 'operator_name = !SAFE_NAME!' | Set-Content '!CFG_FILE!'" >nul 2>&1
 if %errorLevel% equ 0 (
-    echo  [OK] Permissoes do config.ini restringidas a Administradores.
+    echo  [OK] Operador '!SAFE_NAME!' gravado no config.py.
 ) else (
-    echo  [AVISO] Nao foi possivel restringir permissoes do config.ini.
+    echo  [AVISO] Nao foi possivel gravar o nome do operador.
+)
+
+:: ── Proteger config.py (Admins escrevem, Users apenas leem) ──────────────────
+icacls "%PRODMON_DIR%\config.py" /inheritance:r /grant:r "SYSTEM:(F)" "Administrators:(F)" "BUILTIN\Users:(R)" >nul 2>&1
+if %errorLevel% equ 0 (
+    echo  [OK] Permissoes do config.py restringidas a Administradores.
+) else (
+    echo  [AVISO] Nao foi possivel restringir permissoes do config.py.
 )
 
 :: ── Instalar dependencias Python ──────────────────────────────
@@ -104,6 +146,16 @@ if %errorLevel% neq 0 (
 
 :: ── Ocultar pasta ProdMon ─────────────────────────────────────
 attrib +h +s "%PRODMON_DIR%" >nul 2>&1
+
+:: ── Configurar timeout de tela do Windows (powercfg) ──────────
+echo  [..] Configurando tempo de espera da tela para %IDLE_MINUTES% minutos...
+powercfg /change monitor-timeout-ac %IDLE_MINUTES% >nul 2>&1
+powercfg /change monitor-timeout-dc %IDLE_MINUTES% >nul 2>&1
+if %errorLevel% equ 0 (
+    echo  [OK] Tela configurada para desligar apos %IDLE_MINUTES% min (AC e bateria^).
+) else (
+    echo  [AVISO] Nao foi possivel configurar o timeout de tela via powercfg.
+)
 
 :: ── Startup: registro ou launcher dependendo do autostart ─────
 if /i "!AUTOSTART!" == "true" (
@@ -172,7 +224,8 @@ echo  ============================================================
 echo.
 echo   Dados locais  : %PRODMON_DIR%\data\
 echo   Logs          : %PRODMON_DIR%\logs\prodmon.log
-echo   Configuracoes : %PRODMON_DIR%\config.ini
+echo   Operador      : !OPERATOR_NAME!
+echo   Configuracoes : %PRODMON_DIR%\config.py
 if /i "!AUTOSTART!" == "true" (
     echo   Startup       : Automatico em cada login ^(HKLM\...\Run\%REG_NAME%^)
 ) else (
@@ -180,7 +233,7 @@ if /i "!AUTOSTART!" == "true" (
     echo   Atalho Desktop: %PUBLIC%\Desktop\Iniciar ProdMon.vbs
 )
 echo.
-echo   PROXIMO PASSO: Edite o config.ini e defina o caminho
+echo   PROXIMO PASSO: Edite o config.py e defina o caminho
 echo   de rede correto em "network_dir"
 echo.
 pause

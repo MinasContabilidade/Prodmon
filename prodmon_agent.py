@@ -1,5 +1,5 @@
 """
-ProdMon Agent v1.2
+ProdMon Agent v1.3
 ==================
 Monitora atividade de mouse/teclado do usuário de forma silenciosa.
 
@@ -116,7 +116,7 @@ class DebugOverlay:
 
         agent = self._agent
         tk.Label(root,
-                 text=f"● ProdMon Debug  [{agent.hostname} · {agent.username}]",
+                 text=f"● ProdMon Debug  [{agent.operator_name} · {agent.hostname}]",
                  bg=BG, fg=GRAY, font=FONT_T, anchor="w"
                  ).pack(fill="x", padx=10, pady=(7, 0))
 
@@ -152,10 +152,9 @@ class DebugOverlay:
                 root.destroy()
                 return
 
-            state   = agent.current_state
-            elapsed = max(0, int((datetime.now() - agent.state_start).total_seconds()))
-
             with agent._lock:
+                state   = agent.current_state
+                elapsed = max(0, int((datetime.now() - agent.state_start).total_seconds()))
                 act = agent.today_data["summary"].get("active_seconds",  0)
                 idl = agent.today_data["summary"].get("idle_seconds",    0)
                 lck = agent.today_data["summary"].get("locked_seconds",  0)
@@ -205,6 +204,12 @@ class ProdMonAgent:
         self.local_dir   = Path(self.config.get('paths', 'local_dir'))
         self.network_dir = Path(self.config.get('paths', 'network_dir'))
 
+        # Nome do operador (identificação humana para relatórios)
+        self.operator_name = (
+            self.config.get('user', 'operator_name').strip()
+            if self.config.has_option('user', 'operator_name') else ''
+        ) or self.username  # fallback: login do Windows
+
         self.idle_threshold_secs = self.config.getint('settings', 'idle_threshold_minutes') * 60
         self.sync_interval_secs  = self.config.getint('settings', 'sync_interval_minutes')  * 60
         self.check_interval_secs = self.config.getint('settings', 'check_interval_seconds')
@@ -236,7 +241,8 @@ class ProdMonAgent:
         atexit.register(self._atexit_handler)
 
         logging.info(
-            f"ProdMon v1.2 iniciado | Host: {self.hostname} | Usuário: {self.username}"
+            f"ProdMon v1.3 iniciado | Host: {self.hostname} | "
+            f"Operador: {self.operator_name} | Usuário: {self.username}"
         )
         logging.info(
             f"Ociosidade: {self.idle_threshold_secs}s | "
@@ -250,7 +256,7 @@ class ProdMonAgent:
     def _load_config(self, path: str) -> configparser.ConfigParser:
         cfg = configparser.ConfigParser()
         if not cfg.read(path, encoding='utf-8'):
-            raise FileNotFoundError(f"config.ini não encontrado: {path}")
+            raise FileNotFoundError(f"config.py não encontrado: {path}")
         return cfg
 
     # ── Logging ───────────────────────────────────────────────────────────────
@@ -278,7 +284,30 @@ class ProdMonAgent:
 
     # ── PID ───────────────────────────────────────────────────────────────────
 
+    def _check_already_running(self):
+        """Verifica se já existe outra instância do agente rodando."""
+        pid_file = self.local_dir / 'prodmon.pid'
+        if not pid_file.exists():
+            return
+        try:
+            old_pid = int(pid_file.read_text().strip())
+            if old_pid == os.getpid():
+                return
+            # Verifica se o processo ainda está vivo
+            os.kill(old_pid, 0)  # signal 0 = checa existência
+            # Se chegou aqui, o processo está vivo → abortar
+            logging.warning(
+                f"Outra instância já está rodando (PID {old_pid}). Encerrando."
+            )
+            sys.exit(0)
+        except (ValueError, ProcessLookupError, PermissionError):
+            # PID inválido, processo morto, ou sem permissão (considerar morto)
+            pass
+        except OSError:
+            pass
+
     def _write_pid(self):
+        self._check_already_running()
         try:
             (self.local_dir / 'prodmon.pid').write_text(str(os.getpid()))
         except Exception:
@@ -301,10 +330,11 @@ class ProdMonAgent:
     def _make_daily_data(self, now: datetime) -> dict:
         """Cria estrutura de dados para um novo dia."""
         return {
-            "machine":  self.hostname,
-            "username": self.username,
-            "date":     now.date().isoformat(),
-            "version":  "1.2",
+            "machine":       self.hostname,
+            "operator_name": self.operator_name,
+            "username":      self.username,
+            "date":          now.date().isoformat(),
+            "version":       "1.3",
             "events":   [
                 {
                     "type":      "boot",
@@ -329,6 +359,7 @@ class ProdMonAgent:
 
                 # Retrocompatibilidade: garante campos novos se faltarem
                 data.setdefault('username', self.username)
+                data.setdefault('operator_name', self.operator_name)
                 data['summary'].setdefault('locked_seconds', 0)
                 if 'session_start' not in data['summary']:
                     boot = next((e for e in data['events'] if e['type'] == 'boot'), None)
@@ -347,14 +378,21 @@ class ProdMonAgent:
         return data
 
     def _write_data(self, data: dict = None):
-        """Persiste dados no arquivo local JSON (thread-safe quanto ao arquivo)."""
+        """Persiste dados no arquivo local JSON (escrita atômica via tmp + replace)."""
         data = data or self.today_data
         f = self._data_file(date.fromisoformat(data['date']))
+        tmp = f.with_suffix('.tmp')
         try:
-            with open(f, 'w', encoding='utf-8') as fp:
+            with open(tmp, 'w', encoding='utf-8') as fp:
                 json.dump(data, fp, indent=2, ensure_ascii=False)
+            os.replace(str(tmp), str(f))  # atômico em NTFS
         except Exception as e:
             logging.error(f"Erro ao salvar dados locais: {e}")
+            # Limpa arquivo temporário se sobrou
+            try:
+                tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     # ── State recording ───────────────────────────────────────────────────────
 
@@ -464,11 +502,6 @@ class ProdMonAgent:
             is_today = (f.resolve() == today_file.resolve())
             try:
                 dest = net_dir / f.name
-                if dest.exists() and dest.stat().st_size == f.stat().st_size and not is_today:
-                    f.unlink()
-                    logging.info(f"Já sincronizado, removido local: {f.name}")
-                    synced += 1
-                    continue
                 shutil.copy2(str(f), str(dest))
                 logging.info(f"Sync OK: {f.name} → {dest}")
                 synced += 1
@@ -554,7 +587,14 @@ class ProdMonAgent:
                 # ── 2. Verificar virada de dia ────────────────────────────────
                 self._check_date_rollover()
 
-                # ── 3. Detecção de ociosidade por input (fallback) ────────────
+                # ── 3. Fallback: polling de lock de sessão (se WTS não disponível) ──
+                if self.current_state != 'locked' and _is_session_locked():
+                    self._handle_session_lock(datetime.now())
+                    continue
+                elif self.current_state == 'locked' and not _is_session_locked():
+                    self._handle_session_unlock(datetime.now())
+
+                # ── 4. Detecção de ociosidade por input ───────────────────────
                 # Não aplica se sessão está bloqueada (lock já cobre o período)
                 if self.current_state == 'locked':
                     continue
@@ -691,16 +731,16 @@ def _is_session_locked() -> bool:
 
 def main():
     script_dir  = Path(sys.executable if getattr(sys, 'frozen', False) else __file__).parent
-    config_path = script_dir / 'config.ini'
+    config_path = script_dir / 'config.py'
 
     if not config_path.exists():
-        config_path = Path(r'C:\ProgramData\ProdMon\config.ini')
+        config_path = Path(r'C:\ProgramData\ProdMon\config.py')
 
     if not config_path.exists():
         fallback_log = Path(r'C:\ProgramData\ProdMon\logs\startup_error.txt')
         fallback_log.parent.mkdir(parents=True, exist_ok=True)
         fallback_log.write_text(
-            f"[{datetime.now()}] config.ini não encontrado em: {config_path}\n"
+            f"[{datetime.now()}] config.py não encontrado em: {config_path}\n"
         )
         return
 
