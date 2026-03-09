@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
-import data_loader
 import os
-import json
+import data_loader
 
 st.set_page_config(
     page_title="ProdMon | BI",

@@ -168,6 +168,9 @@ set "SAFE_NAME=!SAFE_NAME:]=!"
 set "SAFE_NAME=!SAFE_NAME:{=!"
 set "SAFE_NAME=!SAFE_NAME:}=!"
 set "SAFE_NAME=!SAFE_NAME:==!"
+set "SAFE_NAME=!SAFE_NAME:$=!"
+:: Remove backtick (interpretado pelo PowerShell como escape)
+set "SAFE_NAME=!SAFE_NAME:`=!"
 :: Usa PowerShell para substituir a linha operator_name no arquivo
 powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^operator_name\s*=.*', 'operator_name = ''!SAFE_NAME!''' | Set-Content '!CFG_FILE!'" >nul 2>&1
 if %errorLevel% equ 0 (
@@ -262,7 +265,8 @@ if "%INSTALL_DASHBOARD%"=="true" (
     echo  [..] Criando atalhos do Dashboard...
     set "VBS_DASH=%PRODMON_DIR%\start_dashboard.vbs"
     echo Set WshShell = CreateObject^("WScript.Shell"^) > "!VBS_DASH!"
-    echo WshShell.Run "cmd.exe /c cd /d """%PRODMON_DIR%\dashboard""" ^& pip install -r requirements.txt ^& streamlit run app.py", 0, False >> "!VBS_DASH!"
+    :: --server.address=127.0.0.1 restringe acesso ao localhost (segurança: evita exposicao na rede)
+    echo WshShell.Run "cmd.exe /c cd /d """%PRODMON_DIR%\dashboard""" ^& pip install -r requirements.txt ^& streamlit run app.py --server.address=127.0.0.1 --server.headless=true", 0, False >> "!VBS_DASH!"
 
     set "LNK_DASH_DESKTOP=%PUBLIC%\Desktop\Abrir Dashboard ProdMon.lnk"
     powershell -NoProfile -Command "$wshell = New-Object -ComObject WScript.Shell; $shortcut = $wshell.CreateShortcut('!LNK_DASH_DESKTOP!'); $shortcut.TargetPath = '!VBS_DASH!'; $shortcut.WorkingDirectory = '%PRODMON_DIR%'; $shortcut.Description = 'Abre o painel de BI do ProdMon'; $shortcut.Save()" >nul 2>&1

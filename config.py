@@ -1,3 +1,4 @@
+[user]
 # Nome do operador desta máquina (preenchido durante a instalação)
 # Usado para identificar a pessoa nos relatórios e logs de produtividade
 operator_name = 
@@ -35,6 +36,6 @@ sync_interval_minutes = 60
 check_interval_seconds = 10
 
 [debug]
-# true  = exibe janela de debug visual com cronômetro ao vivo (para testes). Por padrão é instalado true, mas mude para false ao instalar definicitivamente nas máquinas dos demais usuarios.
-# false = agente roda silencioso sem janela (padrão de produção)
-debug_mode = true
+# true  = exibe janela de debug visual com cronômetro ao vivo (para testes). Ative temporariamente para testar.
+# false = agente roda silencioso sem janela (PADRÃO PARA PRODUÇÃO)
+debug_mode = false

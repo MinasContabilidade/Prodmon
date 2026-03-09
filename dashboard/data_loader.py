@@ -13,8 +13,8 @@ def get_network_dir() -> str:
                 cfg = json.load(f)
                 if cfg.get("network_dir"):
                     return cfg["network_dir"]
-        except:
-            pass
+        except Exception as e:
+            print(f"Aviso: Erro ao ler dashboard_config.json: {e}")
             
     try:
         import sys
@@ -28,7 +28,7 @@ def get_network_dir() -> str:
             c.read(cfg_path)
             nd = c['paths'].get('network_dir')
             if nd: return nd
-    except:
+    except Exception:
         pass
     return "C:\\Temp\\ProdMonData"
 
@@ -47,6 +47,11 @@ def load_all_data(network_dir: str) -> pd.DataFrame:
             continue # Trata separados depois
             
         try:
+            # Fix #10: Ignora arquivos maiores que 50 MB (proteção contra JSONs maliciosos/corrompidos)
+            MAX_JSON_BYTES = 50 * 1024 * 1024
+            if os.path.getsize(file_path) > MAX_JSON_BYTES:
+                print(f"Aviso: {file_path} excede 50 MB, ignorado.")
+                continue
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
@@ -70,6 +75,11 @@ def load_all_data(network_dir: str) -> pd.DataFrame:
     search_pattern_cons = os.path.join(network_dir, "consolidado_*.json")
     for file_path in glob.glob(search_pattern_cons):
         try:
+            # Fix #10: Ignora consolidados maiores que 50 MB
+            MAX_JSON_BYTES = 50 * 1024 * 1024
+            if os.path.getsize(file_path) > MAX_JSON_BYTES:
+                print(f"Aviso: {file_path} excede 50 MB, ignorado.")
+                continue
             with open(file_path, 'r', encoding='utf-8') as f:
                 data_list = json.load(f)
                 for item in data_list:
@@ -106,15 +116,15 @@ def load_all_data(network_dir: str) -> pd.DataFrame:
         try:
             with open(sched_file, "r", encoding="utf-8") as sf:
                 schedules = json.load(sf)
-        except:
-            pass
+        except Exception as e:
+            print(f"Aviso: Erro ao ler schedules_config.json: {e}")
             
     if os.path.exists(just_file):
         try:
             with open(just_file, "r", encoding="utf-8") as jf:
                 justifications = json.load(jf)
-        except:
-            pass
+        except Exception as e:
+            print(f"Aviso: Erro ao ler justifications_config.json: {e}")
             
     # Aplica as regras de jornada se existirem
     def calc_balance(row):
@@ -214,8 +224,12 @@ def consolidate_logs(network_dir: str, year: int, month: int) -> tuple[int, int]
     Localiza todos os JSONs individuais de um mês específico,
     agrupa os conteúdos num único arquivo consolidado no diretório raiz,
     e exclui os arquivos originais.
-    Retorna (qtde_arquivos_consolidados, tamanho_bytes_reduzido)
+    Retorna (qtde_arquivos_consolidados, total_registros)
     """
+    # Fix #7: Bloqueia consolidação do mês atual para não corromper logs ativos
+    today = date.today()
+    if year == today.year and month == today.month:
+        raise ValueError(f"Não é permitido consolidar o mês atual ({month:02d}/{year}). Aguarde o fechamento do mês.")
     prefix = f"{year:04d}-{month:02d}"
     
     files_to_consolidate = []

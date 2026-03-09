@@ -34,20 +34,24 @@ with col_side:
     st.markdown("### 📂 Base de Dados (Rede)")
     st.caption("Defina o local onde os arquivos JSON dos agentes são armazenados.")
 
-    DASH_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "dashboard_config.json")
+    # Fix #8: O DASH_CONFIG_FILE deve apontar para dashboard/, não para pages/
+    DASH_CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboard_config.json")
 
     def load_dash_config():
         if os.path.exists(DASH_CONFIG_FILE):
             try:
                 with open(DASH_CONFIG_FILE, "r") as f:
                     return json.load(f)
-            except:
-                pass
+            except Exception as e:
+                st.warning(f"Erro ao ler configuração salva: {e}")
         return {}
 
+    # Fix #5: Escrita atômica via arquivo temporário + os.replace()
     def save_dash_config(cfg):
-        with open(DASH_CONFIG_FILE, "w") as f:
+        tmp = DASH_CONFIG_FILE + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(cfg, f)
+        os.replace(tmp, DASH_CONFIG_FILE)
 
     dash_cfg = load_dash_config()
     saved_path = dash_cfg.get("network_dir", "")
@@ -56,12 +60,22 @@ with col_side:
 
     new_dir = st.text_input("Caminho da Pasta de Rede:", value=saved_path)
     if st.button("💾 Salvar Caminho", use_container_width=True):
-        dash_cfg["network_dir"] = new_dir
-        save_dash_config(dash_cfg)
-        st.success("Caminho salvo! Recarregando...")
-        st.cache_resource.clear()
-        st.cache_data.clear()
-        st.rerun()
+        # Fix #4: Validação básica do caminho para evitar Path Traversal acidental
+        # Aceita se: (a) pasta existe, e (b) não parece um dir crítico do SO
+        blocked_paths = ["c:\\windows", "c:\\program files", "c:\\system32"]
+        normalized = new_dir.strip().lower().rstrip("\\")
+        is_blocked = any(normalized == p or normalized.startswith(p + "\\") for p in blocked_paths)
+        if is_blocked:
+            st.error("❌ Caminho bloqueado por segurança. Utilize um diretório dedicado ao ProdMon.")
+        elif not os.path.isabs(new_dir.strip()):
+            st.error("❌ Forneça um caminho absoluto (ex: \\\\SERVIDOR\\ProdMon ou Z:\\ProdMon).")
+        else:
+            dash_cfg["network_dir"] = new_dir.strip()
+            save_dash_config(dash_cfg)
+            st.success("Caminho salvo! Recarregando...")
+            st.cache_resource.clear()
+            st.cache_data.clear()
+            st.rerun()
 
     if net_dir and os.path.exists(str(net_dir)):
         st.success(f"✅ Conectado: `{net_dir}`")
@@ -124,9 +138,17 @@ with col_main:
                     pass
             return {}
 
+        # Fix #5: Escrita atômica nas configurações de jornada
         def save_schedules(sched):
-            with open(SCHEDULE_FILE, "w", encoding="utf-8") as f:
-                json.dump(sched, f, ensure_ascii=False, indent=2)
+            tmp = SCHEDULE_FILE + ".tmp"
+            try:
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(sched, f, ensure_ascii=False, indent=2)
+                os.replace(tmp, SCHEDULE_FILE)
+            except Exception as e:
+                st.error(f"Erro ao salvar jornada: {e}")
+                try: os.remove(tmp)
+                except: pass
 
         schedules = load_schedules()
 

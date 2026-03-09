@@ -19,13 +19,21 @@ def load_justifications():
         try:
             with open(JUST_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            st.warning(f"Erro ao ler justificativas: {e}")
     return {}
 
+# Fix #5: Escrita atômica das justificativas via .tmp + os.replace()
 def save_justifications(j):
-    with open(JUST_FILE, "w", encoding="utf-8") as f:
-        json.dump(j, f, ensure_ascii=False, indent=2)
+    tmp = JUST_FILE + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(j, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, JUST_FILE)
+    except Exception as e:
+        st.error(f"Erro ao salvar justificativa: {e}")
+        try: os.remove(tmp)
+        except: pass
 
 justifications = load_justifications()
 
@@ -174,4 +182,4 @@ with st.form("justification_form"):
         st.success(f"Alteração registrada no departamento para o dia {j_date.strftime('%d/%m/%Y')}!")
         st.cache_resource.clear()
         st.cache_data.clear()
-        # st.rerun() no local após interagir com forms é uma boa prática
+        st.rerun()  # Fix #15: Atualiza a tabela imediatamente após salvar
