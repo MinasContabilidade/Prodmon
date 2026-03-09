@@ -8,6 +8,9 @@ def render_global_sidebar(df):
     Inclui navegação rápida por mês (◀/▶) que ajusta automaticamente Data Inicial e Final.
     Retorna (start_date, end_date, anchor_name).
     """
+    if "pending_toast" in st.session_state:
+        st.toast(st.session_state.pop("pending_toast"), icon="📆")
+
     st.sidebar.header("🔍 Filtros Globais")
 
     # --- Inicialização do Session State ---
@@ -38,9 +41,15 @@ def render_global_sidebar(df):
             _, last_day = calendar.monthrange(new_start.year, new_start.month)
             st.session_state["global_start_date"] = new_start
             st.session_state["global_end_date"] = datetime.date(new_start.year, new_start.month, last_day)
+            st.session_state["pending_toast"] = f"Mês alterado para {new_start.strftime('%m/%Y')}!"
             st.rerun()
     with nav_label:
-        st.markdown(f"<div style='text-align:center;padding-top:6px;font-weight:bold;'>{label_mes}</div>", unsafe_allow_html=True)
+        st.markdown(f"""
+            <div style='text-align:center; padding: 4px; background: rgba(255,255,255,0.05); 
+                        border-radius: 8px; font-weight: 600; font-size: 0.9em; min-width: 80px;'>
+                {label_mes}
+            </div>
+        """, unsafe_allow_html=True)
     with nav_next:
         if st.button("▶", key="nav_next_month", use_container_width=True):
             # Avança 1 mês
@@ -51,6 +60,7 @@ def render_global_sidebar(df):
             _, last_day = calendar.monthrange(new_start.year, new_start.month)
             st.session_state["global_start_date"] = new_start
             st.session_state["global_end_date"] = datetime.date(new_start.year, new_start.month, last_day)
+            st.session_state["pending_toast"] = f"Mês alterado para {new_start.strftime('%m/%Y')}!"
             st.rerun()
 
     # --- Datas Fine-Tuning ---
@@ -64,6 +74,18 @@ def render_global_sidebar(df):
         anchor_index = operadores.index(st.session_state["global_anchor"])
 
     sel_anchor = st.sidebar.selectbox("Colaborador Âncora", options=operadores, index=anchor_index, help="Pessoa principal referenciada nos painéis individuais/comparativos e na folha de ponto.")
+
+    # --- Toasts para UX da mudança de filtros ---
+    changes = []
+    if start_dt != st.session_state["global_start_date"]:
+        changes.append(f"Início: {start_dt.strftime('%d/%m')}")
+    if end_dt != st.session_state["global_end_date"]:
+        changes.append(f"Fim: {end_dt.strftime('%d/%m')}")
+    if sel_anchor != st.session_state["global_anchor"] and sel_anchor is not None:
+        changes.append(f"Âncora: {sel_anchor}")
+        
+    if changes:
+        st.toast(f"Filtro atualizado: {', '.join(changes)}", icon="✨")
 
     # --- Atualiza Session State ---
     st.session_state["global_start_date"] = start_dt

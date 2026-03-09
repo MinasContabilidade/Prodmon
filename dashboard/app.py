@@ -10,6 +10,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Injeção de CSS Customizado - Sistema de Design UI/UX Pro Max
+css_file = os.path.join(os.path.dirname(__file__), "index.css")
+if os.path.exists(css_file):
+    with open(css_file, "r") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 st.title("📊 ProdMon - Visão Geral")
 st.markdown("Bem-vindo ao painel de produtividade da equipe.")
 

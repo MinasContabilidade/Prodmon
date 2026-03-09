@@ -53,13 +53,11 @@ echo  [..] Iniciando download e instalacao automatica do Python 3.11...
 echo       (Aguarde — pode levar 2 a 5 minutos conforme a velocidade da internet)
 echo.
 
-set "PY_INSTALLER=C:\Temp\python_installer_prodmon.exe"
+set "PY_INSTALLER=%TEMP%\python_installer_prodmon.exe"
 set "PY_URL=https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
 
-if not exist "C:\Temp" mkdir "C:\Temp" 2>nul
-
 powershell -NoProfile -Command ^
-  "try { $wc = New-Object Net.WebClient; $wc.DownloadFile('%PY_URL%','%PY_INSTALLER%'); Write-Host '[OK] Download concluido.' } catch { Write-Host '[ERRO] Falha no download: ' + $_.Exception.Message; exit 1 }"
+  "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; try { $wc = New-Object Net.WebClient; $wc.DownloadFile('%PY_URL%','%PY_INSTALLER%'); Write-Host '[OK] Download concluido.' } catch { Write-Host '[ERRO] Falha no download: ' + $_.Exception.Message; exit 1 }"
 
 if %errorLevel% neq 0 (
     color 0C

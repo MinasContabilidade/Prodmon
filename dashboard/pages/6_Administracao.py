@@ -78,16 +78,26 @@ with col_side:
             st.rerun()
 
     if net_dir and os.path.exists(str(net_dir)):
-        st.success(f"✅ Conectado: `{net_dir}`")
+        st.markdown(f"""
+            <div style='padding: 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; color: #D1FAE5;'>
+                <span style='margin-right:8px;'>✅</span>Conectado: <br>
+                <code style='color: #6EE7B7; font-size: 0.85em;'>{net_dir}</code>
+            </div>
+        """, unsafe_allow_html=True)
     else:
-        st.error(f"❌ Pasta inacessível: `{net_dir}`")
+        st.markdown(f"""
+            <div style='padding: 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; color: #FECACA;'>
+                <span style='margin-right:8px;'>❌</span>Pasta inacessível: <br>
+                <code style='color: #FCA5A5; font-size: 0.85em;'>{net_dir}</code>
+            </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 🧹 Cache")
-    if st.button("Limpar Cache de Dados Atuais", use_container_width=True):
+    st.markdown("### 🧹 Manutenção")
+    if st.button("Limpar Cache do Navegador", use_container_width=True):
         st.cache_resource.clear()
         st.cache_data.clear()
-        st.success("Cache limpo!")
+        st.success("Cache limpo com sucesso!")
 
 # ---- COLUNA ESQUERDA (2/3): Consolidação + Jornada ----
 with col_main:

@@ -49,11 +49,11 @@ timeline_df = data_loader.get_user_events_for_timeline(net_dir, machine_name, st
 if timeline_df.empty:
     st.warning("Não foi possível montar a timeline (eventos detalhados não encontrados no JSON original).")
 else:
-    # Gráfico de Gantt
+    # Configuração de Cores Premium (UI/UX Pro Max)
     color_discrete_map = {
-        "Active": "#10B981", # Verde
-        "Idle": "#F59E0B",   # Amarelo
-        "Locked": "#3B82F6"  # Azul
+        "Active": "#38BDF8", # Sky 400
+        "Idle": "#F59E0B",   # Amber 500
+        "Locked": "#64748B"  # Slate 500
     }
     
     fig = px.timeline(
@@ -63,16 +63,28 @@ else:
         y="State", 
         color="State",
         color_discrete_map=color_discrete_map,
-        title=f"Jornada de Trabalho: {selected_op} ({selected_date})",
+        title=f"Jornada de Trabalho: {selected_op}",
         labels={"State": "Estado"},
-        hover_data=["Duration (s)"]
+        hover_data=["Duration (s)"],
+        template="plotly_dark"
     )
     
-    # Ordem do Eixo Y
-    fig.update_yaxes(categoryorder="array", categoryarray=["Active", "Idle", "Locked"])
-    fig.update_layout(xaxis_title="Horário", yaxis_title="")
+    # Ordem do Eixo Y e Estética Global
+    fig.update_yaxes(categoryorder="array", categoryarray=["Active", "Idle", "Locked"], gridcolor="rgba(255,255,255,0.05)")
+    fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
     
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(
+        font_family="Outfit",
+        title_font_size=20,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="Horário do Dia",
+        yaxis_title="",
+        margin=dict(l=20, r=20, t=60, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
     # Exibe resumo do dia selecionado
     row = df_op[df_op['date'] == selected_date].iloc[0]

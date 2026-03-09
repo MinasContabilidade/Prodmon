@@ -1,0 +1,95 @@
+/* PRODMON DESIGN SYSTEM - UI/UX PRO MAX CUSTOM */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+:root {
+    --bg-dark: #0F172A;
+    --card-bg: rgba(30, 41, 59, 0.7);
+    --primary: #38BDF8;
+    --primary-glow: rgba(56, 189, 248, 0.3);
+    --text-main: #F8FAFC;
+    --text-muted: #94A3B8;
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Global Styles */
+.main {
+    background-color: var(--bg-dark);
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Glassmorphism Cards */
+div[data-testid="stMetricValue"] {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    color: var(--primary) !important;
+}
+
+div[data-testid="metric-container"] {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    transition: var(--transition);
+}
+
+div[data-testid="metric-container"]:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+    box-shadow: 0 12px 40px 0 rgba(56, 189, 248, 0.2);
+}
+
+/* Sidebar Refinement */
+section[data-testid="stSidebar"] {
+    background-color: #1e293b !important;
+    border-right: 1px solid var(--glass-border);
+}
+
+/* Custom Typography */
+h1, h2, h3 {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em;
+    color: var(--text-main);
+}
+
+/* Buttons */
+.stButton > button {
+    border-radius: 12px !important;
+    background: linear-gradient(135deg, #38BDF8 0%, #0EA5E9 100%) !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
+    padding: 10px 24px !important;
+    transition: var(--transition) !important;
+    box-shadow: 0 4px 14px 0 rgba(56, 189, 248, 0.39) !important;
+}
+
+.stButton > button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5) !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
+
+/* Tables */
+div[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+}

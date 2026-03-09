@@ -76,17 +76,19 @@ st.markdown("---")
 
 # Ranking Completo
 st.markdown("### 📊 Extrato Completo de Fechamento")
+
+# Custom styling for the dataframe
+styled_df = grouped.rename(columns={
+    "operator_name": "Colaborador",
+    "balance_h": "Saldo Banco (h)",
+    "justification_h": "Total Abonado (h)"
+})[["Colaborador", "Saldo Banco (h)", "Total Abonado (h)"]].sort_values(by="Saldo Banco (h)", ascending=False)
+
 st.dataframe(
-    grouped.rename(columns={
-        "operator_name": "Colaborador",
-        "balance_h": "Saldo Banco (h)",
-        "justification_h": "Total Abonado (h)"
-    })[["Colaborador", "Saldo Banco (h)", "Total Abonado (h)"]]
-    .sort_values(by="Saldo Banco (h)", ascending=False)
-    .style.format({
+    styled_df.style.format({
         "Saldo Banco (h)": "{:+.1f}h",
         "Total Abonado (h)": "{:.1f}h"
-    }),
+    }).background_gradient(subset=["Saldo Banco (h)"], cmap="RdYlGn"),
     use_container_width=True
 )
 

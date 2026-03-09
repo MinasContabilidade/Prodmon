@@ -84,6 +84,29 @@ comp_df["Ativo (h)"] = comp_df["active_seconds"] / 3600
 
 if not comp_df.empty:
     import plotly.express as px
-    fig = px.bar(comp_df, x="date", y="Ativo (h)", color="Colaborador", barmode="group",
-                 title="Total de Horas Ativas por Dia")
-    st.plotly_chart(fig, use_container_width=True)
+    fig = px.bar(
+        comp_df, 
+        x="date", 
+        y="Ativo (h)", 
+        color="Colaborador", 
+        barmode="group",
+        title="Total de Horas Ativas por Dia (Comparativo)",
+        color_discrete_sequence=["#38BDF8", "#818CF8"], # Sky 400 e Indigo 400
+        template="plotly_dark"
+    )
+    
+    fig.update_layout(
+        font_family="Outfit",
+        title_font_size=20,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="Data",
+        yaxis_title="Horas Ativas",
+        margin=dict(l=20, r=20, t=60, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    fig.update_yaxes(gridcolor="rgba(255,255,255,0.05)")
+    fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})

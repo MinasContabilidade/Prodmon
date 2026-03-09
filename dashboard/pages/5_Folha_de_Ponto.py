@@ -127,18 +127,22 @@ for i in range(num_days):
     }
     calendar_data.append(row_data)
 
-st.markdown(f"#### Extrato / Folha de `{selected_op}` ({start_dt.strftime('%d/%m')} a {end_dt.strftime('%d/%m')})")
+st.markdown(f"#### 📜 Extrato / Folha de `{selected_op}`")
 
 col_k1, col_k2, col_k3 = st.columns(3)
-col_k1.metric("Fechamento (Saldo Acumulado do Período)", f"{total_saldo_periodo:+.1f}h")
+col_k1.metric("Fechamento (Saldo Acumulado)", f"{total_saldo_periodo:+.1f}h", help="Diferença entre horas trabalhadas/abonadas e jornada esperada.")
 
-st.info("Passe o mouse na tabela para editar uma justificativa para qualquer dia.")
-
+# Tabela estilizada
 df_cal = pd.DataFrame(calendar_data)
 
 st.dataframe(
-    df_cal[["Data", "Dia da Semana", "Status", "Trabalhadas (h)", "Jornada Esp. (h)", "Abonos (h)", "Motivo / Justificativa", "Saldo Diário"]]
-    .style.apply(lambda x: ['background-color: rgba(255, 0, 0, 0.1)' if v == 'Ausência S/ Registro' else 'background-color: rgba(0, 255, 0, 0.1)' if v == 'Justificado' else '' for v in x], subset=['Status'])
+    df_cal[["Data", "Dia da Semana", "Status", "Trabalhadas (h)", "Jornada Esp. (h)", "Abonos (h)", "Saldo Diário", "Motivo / Justificativa"]]
+    .style.apply(lambda x: [
+        'background-color: rgba(239, 68, 68, 0.2); color: #FECACA' if v == 'Ausência S/ Registro' 
+        else 'background-color: rgba(16, 185, 129, 0.2); color: #D1FAE5' if v == 'Justificado' 
+        else 'color: #94A3B8' if v == 'FDS'
+        else '' for v in x
+    ], subset=['Status'])
     .format({
         "Trabalhadas (h)": "{:.1f}", 
         "Jornada Esp. (h)": "{:.1f}", 
