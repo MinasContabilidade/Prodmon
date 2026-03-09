@@ -14,50 +14,10 @@ st.set_page_config(
 st.title("📊 ProdMon - Visão Geral")
 st.markdown("Bem-vindo ao painel de produtividade da equipe.")
 
-# Gerenciamento de Configuração Persistente do Dashboard
-DASH_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "dashboard_config.json")
-
-def load_dash_config():
-    if os.path.exists(DASH_CONFIG_FILE):
-        try:
-            with open(DASH_CONFIG_FILE, "r") as f:
-                return json.load(f)
-        except:
-            pass
-    return {}
-
-def save_dash_config(cfg):
-    with open(DASH_CONFIG_FILE, "w") as f:
-        json.dump(cfg, f)
-
-dash_cfg = load_dash_config()
-saved_path = dash_cfg.get("network_dir", "")
-
-if not saved_path:
-    saved_path = data_loader.get_network_dir()
-
-# --- Sidebar: Configurações de Dados ---
-st.sidebar.header("⚙️ Configurações Base")
-
-with st.sidebar.expander("Pasta de Logs", expanded=(not os.path.exists(str(saved_path)))):
-    new_dir = st.text_input("Caminho da Rede:", value=saved_path)
-    if st.button("Salvar Caminho"):
-        dash_cfg["network_dir"] = new_dir
-        save_dash_config(dash_cfg)
-        st.success("Salvo!")
-        st.rerun()
-
-net_dir = dash_cfg.get("network_dir", saved_path)
-
-if st.sidebar.button("🔄 Recarregar Arquivos"):
-    st.cache_resource.clear()
-    st.cache_data.clear()
-    st.rerun()
-
-st.sidebar.markdown("---")
+net_dir = data_loader.get_network_dir()
 
 if not net_dir or str(net_dir).strip() == "":
-    st.error("⚠️ Caminho da rede não configurado. Use a barra lateral para definir.")
+    st.error("⚠️ Caminho da rede não configurado. Acesse a aba Administração para definir.")
     st.stop()
 
 if not os.path.exists(net_dir):
@@ -76,30 +36,16 @@ if df.empty:
     st.info("Nenhum dado encontrado na rede ainda. O agente já foi instalado nas máquinas?")
     st.stop()
 
-# Sidebar Filters
-st.sidebar.header("Filtros Globais")
-
-import datetime
-today = datetime.date.today()
-start_of_year = datetime.date(today.year, 1, 1)
-
-col1, col2 = st.sidebar.columns(2)
-start_dt = col1.date_input("Data Inicial", value=start_of_year, format="DD/MM/YYYY")
-end_dt = col2.date_input("Data Final", value=today, format="DD/MM/YYYY")
-
-if start_dt > end_dt:
-    st.sidebar.error("A Data Inicial não pode ser maior que a Data Final.")
-    st.stop()
+import sidebar
+start_dt, end_dt, sel_anchor = sidebar.render_global_sidebar(df)
 
 mask = (df['date'] >= start_dt) & (df['date'] <= end_dt)
 df_filtered = df.loc[mask]
 
-st.markdown("---")
-
 # --- Alerta Inteligente de Meses Não Consolidados ---
 unconsolidated_months = data_loader.get_unconsolidated_past_months(net_dir)
 if unconsolidated_months:
-    st.info(f"💡 **Dica de Performance:** Há {len(unconsolidated_months)} mês(es) finalizado(s) (ex {unconsolidated_months[-1]}) com arquivos diários avulsos na rede. Vá na aba **Administração** e clique em **Consolidar** para agilizar o dashboard!", icon="⚡")
+    st.info(f"💡 **Dica de Performance:** Há {len(unconsolidated_months)} mês(es) finalizado(s) (ex: {unconsolidated_months[-1]}) com arquivos avulsos na rede. Vá na aba **Administração** e clique em **Consolidar** para agilizar o dashboard!", icon="⚡")
 
 if df_filtered.empty:
     st.warning("Nenhum registro para o período selecionado.")

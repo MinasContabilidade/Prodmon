@@ -15,23 +15,28 @@ if df.empty:
     st.warning("Sem dados.")
     st.stop()
 
-# Filtros
-col1, col2 = st.columns(2)
-operadores = sorted(df['operator_name'].unique())
-selected_op = col1.selectbox("Selecione o Colaborador:", operadores)
+import sidebar
+start_dt, end_dt, selected_op = sidebar.render_global_sidebar(df)
+
+st.markdown(f"**Foco em:** `{selected_op}`")
 
 # Filtra datas disponíveis para o colaborador
 df_op = df[df['operator_name'] == selected_op]
+
+# Respeitar o Filtro Global de datas
+mask = (df_op['date'] >= start_dt) & (df_op['date'] <= end_dt)
+df_op = df_op.loc[mask]
+
 datas_disp = sorted(df_op['date'].unique(), reverse=True)
 
 if not datas_disp:
-    st.info("Nenhuma data encontrada para este operador.")
+    st.info("Nenhuma data encontrada para este operador no período do Filtro Global.")
     st.stop()
 
 def format_date_br(d):
     return d.strftime("%d/%m/%Y")
 
-selected_date = col2.selectbox("Selecione o Dia:", datas_disp, format_func=format_date_br)
+selected_date = st.selectbox("Selecione o Dia para Timeline (dentro do Filtro Global):", datas_disp, format_func=format_date_br)
 
 # Busca o machine_name exato daquele dia
 machine_name = df_op[df_op['date'] == selected_date].iloc[0]['machine']

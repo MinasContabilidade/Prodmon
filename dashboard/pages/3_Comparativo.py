@@ -20,33 +20,26 @@ if len(operadores) < 2:
     st.warning("É necessário ter pelo menos 2 colaboradores registrados para fazer um comparativo.")
     st.stop()
 
-# Filtros Gerais (Data)
-import datetime
-today = datetime.date.today()
-start_of_year = datetime.date(today.year, 1, 1)
+import sidebar
+start_dt, end_dt, op_A = sidebar.render_global_sidebar(df)
 
-st.sidebar.markdown("### 📅 Período Comum")
-col_s1, col_s2 = st.sidebar.columns(2)
-start_dt = col_s1.date_input("Data Inicial", value=start_of_year, format="DD/MM/YYYY")
-end_dt = col_s2.date_input("Data Final", value=today, format="DD/MM/YYYY")
-
-if start_dt > end_dt:
-    st.sidebar.error("A Data Inicial não pode ser maior que a Final.")
-    st.stop()
+st.markdown(f"**Analisando período:** `{start_dt.strftime('%d/%m/%Y')}` a `{end_dt.strftime('%d/%m/%Y')}`")
 
 df = df[(df['date'] >= start_dt) & (df['date'] <= end_dt)]
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### Seleção A")
-    op_A = st.selectbox("Colaborador A", operadores, index=0)
+    st.markdown("### Colaborador Âncora (A)")
+    st.info(f"**{op_A}**")
     df_A = df[df['operator_name'] == op_A]
 
 with col2:
-    st.markdown("### Seleção B")
-    op_B = st.selectbox("Colaborador B", operadores, index=1 if len(operadores) > 1 else 0)
-    df_B = df[df['operator_name'] == op_B]
+    st.markdown("### Seleção Desafiante (B)")
+    # Remove A da lista de B para nao comparar com si próprio
+    opcoes_b = [op for op in operadores if op != op_A]
+    op_B = st.selectbox("Colaborador B", opcoes_b, index=0 if opcoes_b else None)
+    df_B = df[df['operator_name'] == op_B] if op_B else pd.DataFrame()
 
 st.markdown("---")
 

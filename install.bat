@@ -163,6 +163,11 @@ set "SAFE_NAME=!SAFE_NAME:|=!"
 set "SAFE_NAME=!SAFE_NAME:>=!"
 set "SAFE_NAME=!SAFE_NAME:<=!"
 set "SAFE_NAME=!SAFE_NAME:;=!"
+set "SAFE_NAME=!SAFE_NAME:[=!"
+set "SAFE_NAME=!SAFE_NAME:]=!"
+set "SAFE_NAME=!SAFE_NAME:{=!"
+set "SAFE_NAME=!SAFE_NAME:}=!"
+set "SAFE_NAME=!SAFE_NAME:==!"
 :: Usa PowerShell para substituir a linha operator_name no arquivo
 powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^operator_name\s*=.*', 'operator_name = ''!SAFE_NAME!''' | Set-Content '!CFG_FILE!'" >nul 2>&1
 if %errorLevel% equ 0 (

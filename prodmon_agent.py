@@ -502,7 +502,9 @@ class ProdMonAgent:
             is_today = (f.resolve() == today_file.resolve())
             try:
                 dest = net_dir / f.name
-                shutil.copy2(str(f), str(dest))
+                dest_tmp = dest.with_suffix('.tmp')
+                shutil.copy2(str(f), str(dest_tmp))
+                os.replace(str(dest_tmp), str(dest))
                 logging.info(f"Sync OK: {f.name} → {dest}")
                 synced += 1
                 if not is_today:

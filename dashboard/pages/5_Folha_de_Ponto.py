@@ -39,28 +39,21 @@ if df.empty:
 
 operadores = sorted(df['operator_name'].unique())
 
-# --- Filtros de RH ---
-c1, c2, c3 = st.columns(3)
-selected_op = c1.selectbox("Colaborador:", operadores)
-selected_year = c2.number_input("Ano da Folha:", value=datetime.date.today().year, min_value=2020)
-selected_month = c3.selectbox("Mês da Folha:", range(1, 13), format_func=lambda x: f"{x:02d}")
+import sidebar
+start_dt, end_dt, selected_op = sidebar.render_global_sidebar(df)
 
 st.markdown("---")
 
-# --- Processando Dados do Colaborador para o Mês ---
-# Extrai os dias daquele mês para construir um calendário
-_, num_days = calendar.monthrange(selected_year, selected_month)
-
+# --- Processando Dados do Colaborador para o Período ---
 df_op = df[(df['operator_name'] == selected_op)].copy()
-# Garantindo que df_op date seja lido ou como datetime.date para comparar
-# Criaremos um array de dias gerando as linhas sintéticas do Calendário
 
 calendar_data = []
+total_saldo_periodo = 0.0
 
-total_saldo_mensal = 0.0
+num_days = (end_dt - start_dt).days + 1
 
-for day in range(1, num_days + 1):
-    current_date = datetime.date(selected_year, selected_month, day)
+for i in range(num_days):
+    current_date = start_dt + datetime.timedelta(days=i)
     
     # Verifica final de semana
     is_weekend = current_date.weekday() >= 5
@@ -99,7 +92,7 @@ for day in range(1, num_days + 1):
         # Se era dia útil, ideal seria bal_h = just_h - expected_h, mas deixaremos simples na v1
         bal_h += just_h
 
-    total_saldo_mensal += bal_h
+    total_saldo_periodo += bal_h
         
     status = ""
     if is_weekend:
@@ -126,10 +119,10 @@ for day in range(1, num_days + 1):
     }
     calendar_data.append(row_data)
 
-st.markdown(f"#### Folha de Ponto de {selected_op} ({selected_month:02d}/{selected_year})")
+st.markdown(f"#### Extrato / Folha de `{selected_op}` ({start_dt.strftime('%d/%m')} a {end_dt.strftime('%d/%m')})")
 
 col_k1, col_k2, col_k3 = st.columns(3)
-col_k1.metric("Fechamento (Saldo Acumulado do Mês)", f"{total_saldo_mensal:+.1f}h")
+col_k1.metric("Fechamento (Saldo Acumulado do Período)", f"{total_saldo_periodo:+.1f}h")
 
 st.info("Passe o mouse na tabela para editar uma justificativa para qualquer dia.")
 
