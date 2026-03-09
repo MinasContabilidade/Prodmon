@@ -1,160 +1,176 @@
 @echo off
 setlocal EnableDelayedExpansion
+chcp 65001 >nul 2>&1
+color 0A
 
-:: ============================================================
-::  ProdMon Agent v1.3 - Script de Instalacao
-::  Execute como Administrador
-:: ============================================================
+:: ================================================================
+::  ProdMon Installer v2.0
+::  Instalacao Guiada - Minas Contabilidade
+:: ================================================================
 
-set "PRODMON_DIR=C:\ProgramData\ProdMon"
-set "SCRIPT_DIR=%~dp0"
-set "REG_KEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-set "REG_NAME=ProdMonAgent"
-set "LAUNCHER=%PRODMON_DIR%\start_prodmon.vbs"
-
+cls
 echo.
-echo  ============================================================
-echo   ProdMon Agent - Instalacao
-echo  ============================================================
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║          PRODMON  -  Sistema de Produtividade           ║
+echo  ║                   Minas Contabilidade                   ║
+echo  ║                    Instalador v2.0                      ║
+echo  ╚══════════════════════════════════════════════════════════╝
 echo.
 
-:: ── Verificar privilegios de administrador ────────────────────
+:: ── Verificar privilegios de administrador ─────────────────────
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo  [ERRO] Execute este script com botao direito ^> "Executar como administrador"
+    color 0C
+    echo  [ERRO] Este instalador precisa de privilegios de Administrador.
+    echo.
+    echo  Feche esta janela e abra novamente com:
+    echo     Botao direito no arquivo ^> "Executar como administrador"
+    echo.
     pause & exit /b 1
 )
 
-:: ── Ler opcao autostart do config.py ──────────────────────────
-:: Ler config usando Python temporário
-for /f "tokens=2 delims==" %%i in ('%PYTHONW% -c "import configparser; c=configparser.ConfigParser(); c.read(r'%PRODMON_DIR%\config.py'); print('AUTO='+c['install'].get('autostart', 'true').lower())" 2^>nul') do (
-    set "AUTOSTART=%%i"
-)
-if not defined AUTOSTART set "AUTOSTART=true"
-:: Se a instalacao nao incluir agente, forcamos autostart=false para os passos abaixo
-if "%INSTALL_AGENT%"=="false" set "AUTOSTART=false"
-echo  [OK] autostart = %AUTOSTART%
-
-:: ── Ler idle_threshold_minutes do config.py ──────────────────
-set "IDLE_MINUTES=5"
-for /f "tokens=1,* delims==" %%a in ('findstr /i "^idle_threshold_minutes" "%SCRIPT_DIR%config.py" 2^>nul') do (
-    set "IDLE_RAW=%%b"
-)
-if defined IDLE_RAW (
-    for /f "tokens=*" %%v in ("!IDLE_RAW!") do set "IDLE_MINUTES=%%v"
-)
-echo  [OK] idle_threshold_minutes = %IDLE_MINUTES%
-
-:: ── Perguntar modo de instalacao ────────────────────────────────
+echo  [OK] Executando com privilegios de Administrador.
 echo.
-echo  O que voce deseja instalar nesta maquina?
-echo  [1] Cliente (Apenas o Agente Invisivel)
-echo  [2] Servidor (Apenas o Dashboard BI)
-echo  [3] Ambos (Agente + Dashboard)
+
+:: ── ETAPA 1: Verificar / Instalar Python ───────────────────────
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║  ETAPA 1/5 - Verificando Python                         ║
+echo  ╚══════════════════════════════════════════════════════════╝
 echo.
-set /p "INSTALL_CHOICE=  Digite 1, 2 ou 3 [1]: "
+
+set "PYTHONW="
+for /f "delims=" %%i in ('where pythonw.exe 2^>nul') do (
+    if not defined PYTHONW set "PYTHONW=%%i"
+)
+
+if defined PYTHONW (
+    echo  [OK] Python ja instalado: !PYTHONW!
+    goto :python_ok
+)
+
+echo  [..] Python nao encontrado nesta maquina.
+echo  [..] Iniciando download e instalacao automatica do Python 3.11...
+echo       (Aguarde — pode levar 2 a 5 minutos conforme a velocidade da internet)
+echo.
+
+set "PY_INSTALLER=C:\Temp\python_installer_prodmon.exe"
+set "PY_URL=https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+
+if not exist "C:\Temp" mkdir "C:\Temp" 2>nul
+
+powershell -NoProfile -Command ^
+  "try { $wc = New-Object Net.WebClient; $wc.DownloadFile('%PY_URL%','%PY_INSTALLER%'); Write-Host '[OK] Download concluido.' } catch { Write-Host '[ERRO] Falha no download: ' + $_.Exception.Message; exit 1 }"
+
+if %errorLevel% neq 0 (
+    color 0C
+    echo.
+    echo  [ERRO] Nao foi possivel baixar o Python automaticamente.
+    echo.
+    echo  Instale manualmente e reinicie o instalador:
+    echo.
+    echo    1. Abra: https://www.python.org/downloads/
+    echo    2. Baixe Python 3.11 (Windows, 64-bit)
+    echo    3. IMPORTANTE: Marque "Add Python to PATH" durante a instalacao
+    echo    4. Apos instalar, reinicie o computador
+    echo    5. Execute novamente este instalador
+    echo.
+    pause & exit /b 1
+)
+
+echo  [..] Instalando Python silenciosamente...
+"%PY_INSTALLER%" /quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Include_test=0
+del /f /q "%PY_INSTALLER%" 2>nul
+
+:: Procurar nos locais padrao caso PATH ainda nao tenha atualizado
+for %%p in (
+    "C:\Program Files\Python311\pythonw.exe"
+    "C:\Program Files\Python312\pythonw.exe"
+    "C:\Program Files\Python313\pythonw.exe"
+    "%LOCALAPPDATA%\Programs\Python\Python311\pythonw.exe"
+    "%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe"
+) do (
+    if exist %%p if not defined PYTHONW set "PYTHONW=%%~p"
+)
+
+if not defined PYTHONW (
+    color 0E
+    echo  [AVISO] Python instalado, mas e necessario REINICIAR o computador.
+    echo          Apos reiniciar, execute este instalador novamente.
+    echo.
+    pause & exit /b 0
+)
+echo  [OK] Python instalado: !PYTHONW!
+
+:python_ok
+echo.
+
+:: ── ETAPA 2: Modo de instalacao ────────────────────────────────
+cls
+echo.
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║  ETAPA 2/5 - O que instalar nesta maquina?             ║
+echo  ╚══════════════════════════════════════════════════════════╝
+echo.
+echo   Esta maquina sera usada para...
+echo.
+echo   [1] AGENTE (Funcionario)
+echo       Instala o monitor de atividade silencioso neste computador.
+echo       O funcionario NAO vera nenhuma janela — roda em segundo plano.
+echo       Use em TODOS os computadores da equipe.
+echo.
+echo   [2] DASHBOARD (Gestor / RH)
+echo       Instala o painel de BI para visualizar relatorios e controle
+echo       de ponto. Use NO COMPUTADOR DO GESTOR ou do RH.
+echo.
+echo   [3] AMBOS (Agente + Dashboard)
+echo       Instala os dois. Util se o proprio gestor tambem sera monitorado.
+echo.
+
+:ask_mode
+set /p "INSTALL_CHOICE=  Qual opcao deseja instalar? [1]: "
 if not defined INSTALL_CHOICE set "INSTALL_CHOICE=1"
 
 set "INSTALL_AGENT=false"
 set "INSTALL_DASHBOARD=false"
+set "INSTALL_MODE_TXT=client"
 
-if "%INSTALL_CHOICE%"=="1" (
-    set "INSTALL_AGENT=true"
-    set "INSTALL_MODE_TXT=client"
-) else if "%INSTALL_CHOICE%"=="2" (
-    set "INSTALL_DASHBOARD=true"
-    set "INSTALL_MODE_TXT=server"
-) else if "%INSTALL_CHOICE%"=="3" (
-    set "INSTALL_AGENT=true"
-    set "INSTALL_DASHBOARD=true"
-    set "INSTALL_MODE_TXT=both"
-) else (
-    echo  [ERRO] Opcao invalida. Instalacao abortada.
-    pause & exit /b 1
-)
+if "%INSTALL_CHOICE%"=="1" ( set "INSTALL_AGENT=true" & set "INSTALL_MODE_TXT=client" & goto :mode_ok )
+if "%INSTALL_CHOICE%"=="2" ( set "INSTALL_DASHBOARD=true" & set "INSTALL_MODE_TXT=server" & goto :mode_ok )
+if "%INSTALL_CHOICE%"=="3" ( set "INSTALL_AGENT=true" & set "INSTALL_DASHBOARD=true" & set "INSTALL_MODE_TXT=both" & goto :mode_ok )
 
-:: ── Perguntar nome do operador (somente se instalar agente) ────
-if "%INSTALL_AGENT%"=="true" (
-    echo.
-    echo  Identificacao do operador desta maquina.
-    echo  (Este nome aparecera nos relatorios de produtividade)
-    echo.
-    set /p "OPERATOR_NAME=  Nome do operador: "
-    if not defined OPERATOR_NAME (
-        set "OPERATOR_NAME=Nao informado"
-    )
-    echo  [OK] Operador: !OPERATOR_NAME!
-) else (
+echo  [!] Opcao invalida. Digite 1, 2 ou 3.
+goto :ask_mode
+
+:mode_ok
+echo  [OK] Modo selecionado: %INSTALL_MODE_TXT%
+
+:: ── ETAPA 3: Nome do operador (se for agente) ──────────────────
+if not "%INSTALL_AGENT%"=="true" (
     set "OPERATOR_NAME=Servidor"
+    goto :etapa4
 )
+
+cls
+echo.
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║  ETAPA 3/5 - Identificacao do Colaborador               ║
+echo  ╚══════════════════════════════════════════════════════════╝
+echo.
+echo   Digite o nome COMPLETO da pessoa que usa este computador.
+echo   Este nome aparecera nos relatorios de produtividade e no
+echo   controle de ponto. Escreva exatamente como deve aparecer.
+echo.
+echo   Exemplos: Ana Souza  |  Carlos Mendes  |  Maria Oliveira
 echo.
 
-:: ── Localizar pythonw.exe ─────────────────────────────────────
-for /f "delims=" %%i in ('where pythonw.exe 2^>nul') do (
-    if not defined PYTHONW set "PYTHONW=%%i"
-)
-if not defined PYTHONW (
-    echo  [ERRO] pythonw.exe nao encontrado.
-    echo         Instale Python 3.8+ marcando a opcao "Add Python to PATH"
-    echo         Download: https://www.python.org/downloads/
-    pause & exit /b 1
-)
-echo  [OK] Python: %PYTHONW%
-
-:: ── Localizar pip ─────────────────────────────────────────────
-for /f "delims=" %%i in ('where pip.exe 2^>nul') do (
-    if not defined PIP set "PIP=%%i"
-)
-if not defined PIP (
-    set "PIP_CMD=%PYTHONW% -m pip"
-) else (
-    set "PIP_CMD=%PIP%"
+:ask_name
+set /p "OPERATOR_NAME=  Nome do colaborador: "
+if not defined OPERATOR_NAME (
+    echo  [!] O nome nao pode ser vazio. Tente novamente.
+    goto :ask_name
 )
 
-:: ── Criar estrutura de diretorios ─────────────────────────────
-echo  [..] Criando diretorios...
-for %%d in (data logs) do (
-    if not exist "%PRODMON_DIR%\%%d" (
-        mkdir "%PRODMON_DIR%\%%d" 2>nul
-    )
-)
-
-:: ── Copiar arquivos ───────────────────────────────────────────
-echo  [..] Copiando arquivos...
-
-if "%INSTALL_AGENT%"=="true" (
-    if not exist "%SCRIPT_DIR%prodmon_agent.py" (
-        echo  [ERRO] prodmon_agent.py nao encontrado em %SCRIPT_DIR%
-        pause & exit /b 1
-    )
-    copy /Y "%SCRIPT_DIR%prodmon_agent.py" "%PRODMON_DIR%\prodmon_agent.py" >nul
-)
-
-:: config.py: nao sobrescreve se ja existir (preserva configuracoes)
-if not exist "%PRODMON_DIR%\config.py" (
-    copy /Y "%SCRIPT_DIR%config.py" "%PRODMON_DIR%\config.py" >nul
-    echo  [OK] config.py copiado. Configure o caminho de rede antes de usar!
-) else (
-    echo  [OK] config.py ja existe - mantido sem alteracoes.
-)
-
-:: ── Copiar Dashboard (se selecionado) ─────────────────────────
-if "%INSTALL_DASHBOARD%"=="true" (
-    echo  [..] Copiando arquivos do Dashboard...
-    if not exist "%PRODMON_DIR%\dashboard" mkdir "%PRODMON_DIR%\dashboard" 2>nul
-    xcopy /Y /E /I "%SCRIPT_DIR%dashboard\*" "%PRODMON_DIR%\dashboard\" >nul 2>&1
-    echo  [OK] Dashboard copiado.
-)
-
-:: ── Gravar configs variaveis no config.py instalado ────────────
-echo  [..] Gravando configuracoes no config.py...
-set "CFG_FILE=%PRODMON_DIR%\config.py"
-
-:: Atualiza install_mode
-powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^install_mode\s*=.*', 'install_mode = ''!INSTALL_MODE_TXT!''' | Set-Content '!CFG_FILE!'" >nul 2>&1
-
-:: Atualiza operator_name
-:: Sanitiza o nome do operador (remove caracteres perigosos para scripts)
+:: Sanitizar o nome
 set "SAFE_NAME=!OPERATOR_NAME!"
 set "SAFE_NAME=!SAFE_NAME:'=!"
 set "SAFE_NAME=!SAFE_NAME:"=!"
@@ -171,138 +187,306 @@ set "SAFE_NAME=!SAFE_NAME:==!"
 set "SAFE_NAME=!SAFE_NAME:$=!"
 :: Remove backtick (interpretado pelo PowerShell como escape)
 set "SAFE_NAME=!SAFE_NAME:`=!"
-:: Usa PowerShell para substituir a linha operator_name no arquivo
-powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^operator_name\s*=.*', 'operator_name = ''!SAFE_NAME!''' | Set-Content '!CFG_FILE!'" >nul 2>&1
-if %errorLevel% equ 0 (
-    echo  [OK] Operador '!SAFE_NAME!' gravado no config.py.
-) else (
-    echo  [AVISO] Nao foi possivel gravar o nome do operador.
+
+echo  [OK] Colaborador identificado: !SAFE_NAME!
+
+:etapa4
+:: ── ETAPA 4: Configuracoes avancadas (Agente) ─────────────────
+if not "%INSTALL_AGENT%"=="true" goto :etapa5
+
+cls
+echo.
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║  ETAPA 4/5 - Configuracoes do Agente de Monitoramento   ║
+echo  ╚══════════════════════════════════════════════════════════╝
+echo.
+echo  ─────────────────────────────────────────────────────────
+echo   4a. INICIALIZACAO AUTOMATICA COM O WINDOWS
+echo  ─────────────────────────────────────────────────────────
+echo.
+echo   Define se o agente sera iniciado automaticamente toda vez
+echo   que o funcionario ligar o computador, sem precisar de
+echo   nenhuma acao manual.
+echo.
+echo   [1] SIM — Iniciar com o Windows automaticamente  (RECOMENDADO)
+echo             O agente comeca a monitorar desde o primeiro login.
+echo.
+echo   [2] NAO — Somente quando acionar manualmente
+echo             Sera criado um atalho na area de trabalho para
+echo             iniciar o agente manualmente quando necessario.
+echo.
+
+:ask_autostart
+set /p "AUTOSTART_CHOICE=  Autostart ao ligar o PC? [1]: "
+if not defined AUTOSTART_CHOICE set "AUTOSTART_CHOICE=1"
+if "%AUTOSTART_CHOICE%"=="1" ( set "AUTOSTART=true" & goto :autostart_ok )
+if "%AUTOSTART_CHOICE%"=="2" ( set "AUTOSTART=false" & goto :autostart_ok )
+echo  [!] Digite 1 ou 2.
+goto :ask_autostart
+:autostart_ok
+echo  [OK] Autostart: !AUTOSTART!
+echo.
+
+echo  ─────────────────────────────────────────────────────────
+echo   4b. MODO DEBUG (JANELA DE ACOMPANHAMENTO)
+echo  ─────────────────────────────────────────────────────────
+echo.
+echo   Define se o agente exibe uma pequena janela de status
+echo   no canto da tela mostrando o estado atual: ATIVO / OCIOSO
+echo   / BLOQUEADO e os cronometros do dia.
+echo.
+echo   [1] SILENCIOSO — Sem janela visivel  (RECOMENDADO para producao)
+echo                    O funcionario nao sabe que esta sendo monitorado.
+echo                    Use este modo ao instalar definitivamente.
+echo.
+echo   [2] TESTE — Exibe janela de acompanhamento ao vivo
+echo               Util para testar se o agente esta funcionando
+echo               corretamente antes do deploy final. O funcionario
+echo               vera a janela no canto da tela.
+echo.
+
+:ask_debug
+set /p "DEBUG_CHOICE=  Modo de execucao? [1]: "
+if not defined DEBUG_CHOICE set "DEBUG_CHOICE=1"
+if "%DEBUG_CHOICE%"=="1" ( set "DEBUG_MODE=false" & goto :debug_ok )
+if "%DEBUG_CHOICE%"=="2" ( set "DEBUG_MODE=true" & goto :debug_ok )
+echo  [!] Digite 1 ou 2.
+goto :ask_debug
+:debug_ok
+echo  [OK] Modo debug: !DEBUG_MODE!
+echo.
+
+echo  ─────────────────────────────────────────────────────────
+echo   4c. TEMPO DE OCIOSIDADE
+echo  ─────────────────────────────────────────────────────────
+echo.
+echo   Quantos minutos sem mexer no mouse ou teclado para o sistema
+echo   considerar que o funcionario saiu da mesa (ocioso)?
+echo.
+echo   Recomendado: 5 minutos (padrao ideal para a maioria dos casos)
+echo   Valores menores = mais sensivel  |  Maiores = menos sensivel
+echo.
+
+:ask_idle
+set /p "IDLE_MINUTES=  Tempo de ociosidade em minutos [5]: "
+if not defined IDLE_MINUTES set "IDLE_MINUTES=5"
+
+:: Verificar se e um numero valido
+set "IDLE_TEST=!IDLE_MINUTES!"
+for /f "delims=0123456789" %%i in ("!IDLE_TEST!") do (
+    echo  [!] Digite apenas numeros (ex: 5).
+    set "IDLE_MINUTES="
+    goto :ask_idle
+)
+if !IDLE_MINUTES! LSS 1 ( echo  [!] Minimo e 1 minuto. & set "IDLE_MINUTES=" & goto :ask_idle )
+if !IDLE_MINUTES! GTR 60 ( echo  [!] Maximo recomendado e 60 minutos. & set "IDLE_MINUTES=" & goto :ask_idle )
+echo  [OK] Ociosidade apos: !IDLE_MINUTES! minutos
+
+:etapa5
+:: ── ETAPA 5: Confirmar e instalar ─────────────────────────────
+cls
+echo.
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║  ETAPA 5/5 - Resumo da Instalacao                      ║
+echo  ╚══════════════════════════════════════════════════════════╝
+echo.
+echo   Revise as configuracoes antes de instalar:
+echo.
+echo   Componentes:
+if "%INSTALL_AGENT%"=="true"     echo     [X] Agente de monitoramento (funcionario)
+if "%INSTALL_DASHBOARD%"=="true" echo     [X] Dashboard BI (gestor / RH)
+echo.
+if "%INSTALL_AGENT%"=="true" (
+    echo   Configuracoes do Agente:
+    echo     Colaborador  : !SAFE_NAME!
+    echo     Autostart    : !AUTOSTART!
+    if "!DEBUG_MODE!"=="true" (
+        echo     Modo         : TESTE ^(janela visivel^)
+    ) else (
+        echo     Modo         : SILENCIOSO ^(producao^)
+    )
+    echo     Ociosidade   : !IDLE_MINUTES! minutos
+    echo.
+)
+echo   Pasta de rede  : N:\MINAS CONTABILIDADE\SISTEMA - PRODMON
+echo   Pasta local    : C:\ProgramData\ProdMon
+echo.
+
+:ask_confirm
+set /p "CONFIRM=  Confirmar e iniciar a instalacao? [S/N]: "
+if /i "%CONFIRM%"=="S" goto :install_start
+if /i "%CONFIRM%"=="N" (
+    echo.
+    echo  Instalacao cancelada pelo usuario.
+    echo.
+    pause & exit /b 0
+)
+echo  [!] Digite S para confirmar ou N para cancelar.
+goto :ask_confirm
+
+:install_start
+echo.
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║  Instalando...                                          ║
+echo  ╚══════════════════════════════════════════════════════════╝
+echo.
+
+set "PRODMON_DIR=C:\ProgramData\ProdMon"
+set "SCRIPT_DIR=%~dp0"
+set "REG_KEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+set "REG_NAME=ProdMonAgent"
+set "LAUNCHER=%PRODMON_DIR%\start_prodmon.vbs"
+
+:: ── Criar estrutura de diretorios ─────────────────────────────
+echo  [..] Criando diretorios...
+for %%d in (data logs) do (
+    if not exist "%PRODMON_DIR%\%%d" mkdir "%PRODMON_DIR%\%%d" 2>nul
 )
 
-:: ── Proteger config.py (Admins escrevem, Users apenas leem) ──────────────────
-icacls "%PRODMON_DIR%\config.py" /inheritance:r /grant:r "SYSTEM:(F)" "Administrators:(F)" "BUILTIN\Users:(R)" >nul 2>&1
-if %errorLevel% equ 0 (
-    echo  [OK] Permissoes do config.py restringidas a Administradores.
-) else (
-    echo  [AVISO] Nao foi possivel restringir permissoes do config.py.
+:: ── Copiar arquivos ────────────────────────────────────────────
+echo  [..] Copiando arquivos do agente...
+if "%INSTALL_AGENT%"=="true" (
+    if not exist "%SCRIPT_DIR%prodmon_agent.py" (
+        color 0C
+        echo  [ERRO] prodmon_agent.py nao encontrado em %SCRIPT_DIR%
+        pause & exit /b 1
+    )
+    copy /Y "%SCRIPT_DIR%prodmon_agent.py" "%PRODMON_DIR%\prodmon_agent.py" >nul
 )
+
+if not exist "%PRODMON_DIR%\config.py" (
+    copy /Y "%SCRIPT_DIR%config.py" "%PRODMON_DIR%\config.py" >nul
+    echo  [OK] config.py copiado.
+) else (
+    echo  [OK] config.py ja existe — mantido sem alteracoes.
+)
+
+if "%INSTALL_DASHBOARD%"=="true" (
+    echo  [..] Copiando Dashboard...
+    if not exist "%PRODMON_DIR%\dashboard" mkdir "%PRODMON_DIR%\dashboard" 2>nul
+    robocopy "%SCRIPT_DIR%dashboard" "%PRODMON_DIR%\dashboard" /E /NJH /NJS /NDL >nul 2>&1
+    echo  [OK] Dashboard copiado.
+)
+
+:: ── Gravar configuracoes no config.py ─────────────────────────
+echo  [..] Gravando configuracoes...
+set "CFG_FILE=%PRODMON_DIR%\config.py"
+
+powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^install_mode\s*=.*', 'install_mode = ''!INSTALL_MODE_TXT!''' | Set-Content '!CFG_FILE!'" >nul 2>&1
+powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^operator_name\s*=.*', 'operator_name = ''!SAFE_NAME!''' | Set-Content '!CFG_FILE!'" >nul 2>&1
+
+if "%INSTALL_AGENT%"=="true" (
+    powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^autostart\s*=.*', 'autostart = !AUTOSTART!' | Set-Content '!CFG_FILE!'" >nul 2>&1
+    powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^debug_mode\s*=.*', 'debug_mode = !DEBUG_MODE!' | Set-Content '!CFG_FILE!'" >nul 2>&1
+    powershell -NoProfile -Command "(Get-Content '!CFG_FILE!') -replace '^idle_threshold_minutes\s*=.*', 'idle_threshold_minutes = !IDLE_MINUTES!' | Set-Content '!CFG_FILE!'" >nul 2>&1
+)
+
+:: ── Proteger config.py ────────────────────────────────────────
+icacls "%PRODMON_DIR%\config.py" /inheritance:r /grant:r "SYSTEM:(F)" "Administrators:(F)" "BUILTIN\Users:(R)" >nul 2>&1
+echo  [OK] Permissoes do config.py restringidas.
 
 :: ── Instalar dependencias Python ──────────────────────────────
-echo  [..] Instalando dependencias Python (pywin32)...
-%PIP_CMD% install pywin32 --quiet --no-warn-script-location 2>nul
-if %errorLevel% neq 0 (
-    echo  [AVISO] Falha ao instalar pywin32.
-    echo          O agente funcionara, mas o hook de desligamento nao estara ativo.
-    echo          Instale manualmente: pip install pywin32
-) else (
-    echo  [OK] pywin32 instalado.
+echo  [..] Instalando dependencias Python...
+set "PIP_CMD="
+for /f "delims=" %%i in ('where pip.exe 2^>nul') do (
+    if not defined PIP_CMD set "PIP_CMD=%%i"
+)
+if not defined PIP_CMD set "PIP_CMD=%PYTHONW% -m pip"
+
+if "%INSTALL_AGENT%"=="true" (
+    %PIP_CMD% install pywin32 --quiet --no-warn-script-location 2>nul
+    if %errorLevel% equ 0 ( echo  [OK] pywin32 instalado. ) else ( echo  [AVISO] Falha ao instalar pywin32 — hook de desligamento nao ativo. )
+)
+
+if "%INSTALL_DASHBOARD%"=="true" (
+    echo  [..] Instalando dependencias do Dashboard (pode demorar)...
+    if exist "%PRODMON_DIR%\dashboard\requirements.txt" (
+        %PIP_CMD% install -r "%PRODMON_DIR%\dashboard\requirements.txt" --quiet --no-warn-script-location >nul 2>&1
+        echo  [OK] Dependencias do Dashboard instaladas.
+    )
 )
 
 :: ── Ocultar pasta ProdMon ─────────────────────────────────────
 attrib +h +s "%PRODMON_DIR%" >nul 2>&1
 
-:: ── Configurar timeout de tela do Windows (powercfg) ──────────
-echo  [..] Configurando tempo de espera da tela para %IDLE_MINUTES% minutos...
-powercfg /change monitor-timeout-ac %IDLE_MINUTES% >nul 2>&1
-powercfg /change monitor-timeout-dc %IDLE_MINUTES% >nul 2>&1
-if %errorLevel% equ 0 (
-    echo  [OK] Tela configurada para desligar apos %IDLE_MINUTES% min (AC e bateria^).
-) else (
-    echo  [AVISO] Nao foi possivel configurar o timeout de tela via powercfg.
-)
-
-:: ── Startup: registro ou launcher dependendo do autostart ─────
-if /i "!AUTOSTART!" == "true" (
-
-    :: ── Registrar no startup do Windows ──────────────────────────
-    echo  [..] Registrando no startup do Windows...
-    reg add "%REG_KEY%" /v "%REG_NAME%" /t REG_SZ ^
-        /d "\"%PYTHONW%\" \"%PRODMON_DIR%\prodmon_agent.py\"" /f >nul
-    if %errorLevel% neq 0 (
-        echo  [ERRO] Falha ao registrar no startup.
-        pause & exit /b 1
-    )
-    echo  [OK] Registrado: HKLM\...\Run\%REG_NAME%
-    echo  [OK] O agente sera iniciado automaticamente em cada login do Windows.
-
-) else (
-
-    :: ── Remover entrada de startup se existia ────────────────────
-    reg delete "%REG_KEY%" /v "%REG_NAME%" /f >nul 2>&1
-
-    :: ── Criar launcher VBS (inicio silencioso sem terminal) ──────
-    echo  [..] Criando launcher start_prodmon.vbs...
-    (
-        echo Set oShell = CreateObject^("WScript.Shell"^)
-        echo oShell.Run """!PYTHONW!""" ^& " " ^& """!PRODMON_DIR!\prodmon_agent.py""", 0, False
-    ) > "%LAUNCHER%"
-    if %errorLevel% equ 0 (
-        echo  [OK] Launcher criado: %LAUNCHER%
-        echo  [OK] Clique duplo em start_prodmon.vbs para iniciar o agente sem terminal.
-    ) else (
-        echo  [AVISO] Nao foi possivel criar o launcher VBS.
-    )
-
-    :: Cria tambem um atalho na area de trabalho publica (opcional)
-    set "DESKTOP_LINK=%PUBLIC%\Desktop\Iniciar ProdMon.vbs"
-    copy /Y "%LAUNCHER%" "%DESKTOP_LINK%" >nul 2>&1
-    if %errorLevel% equ 0 (
-        echo  [OK] Atalho criado na area de trabalho: "Iniciar ProdMon.vbs"
-    )
-
-)
-
+:: ── Configurar timeout de tela ────────────────────────────────
 if "%INSTALL_AGENT%"=="true" (
-    :: ── Iniciar agente imediatamente ──────────────────────────────────
+    echo  [..] Configurando tempo de ociosidade da tela (%IDLE_MINUTES% min)...
+    powercfg /change monitor-timeout-ac %IDLE_MINUTES% >nul 2>&1
+    powercfg /change monitor-timeout-dc %IDLE_MINUTES% >nul 2>&1
+    echo  [OK] Tela configurada para desligar apos %IDLE_MINUTES% min.
+)
+
+:: ── Startup / Launcher ────────────────────────────────────────
+if "%INSTALL_AGENT%"=="true" (
+    if /i "!AUTOSTART!"=="true" (
+        echo  [..] Registrando no startup do Windows...
+        reg add "%REG_KEY%" /v "%REG_NAME%" /t REG_SZ /d "\"%PYTHONW%\" \"%PRODMON_DIR%\prodmon_agent.py\"" /f >nul
+        if %errorLevel% equ 0 ( echo  [OK] Agente registrado no startup. ) else ( echo  [AVISO] Falha ao registrar startup. )
+    ) else (
+        reg delete "%REG_KEY%" /v "%REG_NAME%" /f >nul 2>&1
+        echo  [..] Criando launcher start_prodmon.vbs...
+        (
+            echo Set oShell = CreateObject^("WScript.Shell"^)
+            echo oShell.Run """!PYTHONW!""" ^& " " ^& """%PRODMON_DIR%\prodmon_agent.py""", 0, False
+        ) > "%LAUNCHER%"
+        copy /Y "%LAUNCHER%" "%PUBLIC%\Desktop\Iniciar ProdMon.vbs" >nul 2>&1
+        echo  [OK] Atalho criado: Iniciar ProdMon.vbs na area de trabalho.
+    )
+)
+
+if "%INSTALL_DASHBOARD%"=="true" (
+    echo  [..] Criando atalho do Dashboard...
+    set "VBS_DASH=%PRODMON_DIR%\start_dashboard.vbs"
+    echo Set WshShell = CreateObject^("WScript.Shell"^) > "!VBS_DASH!"
+    :: --server.address=127.0.0.1 restringe ao localhost (segurança)
+    echo WshShell.Run "cmd.exe /c cd /d """%PRODMON_DIR%\dashboard""" ^& streamlit run app.py --server.address=127.0.0.1 --server.headless=true", 0, False >> "!VBS_DASH!"
+    set "LNK_DASH=%PUBLIC%\Desktop\Abrir Dashboard ProdMon.lnk"
+    powershell -NoProfile -Command "$ws=$env:PUBLIC+'\Desktop\Abrir Dashboard ProdMon.lnk'; $wsh=New-Object -ComObject WScript.Shell; $sc=$wsh.CreateShortcut($ws); $sc.TargetPath='%PRODMON_DIR%\start_dashboard.vbs'; $sc.Description='Abre o painel BI ProdMon'; $sc.Save()" >nul 2>&1
+    echo  [OK] Atalho do Dashboard criado na area de trabalho.
+)
+
+:: ── Iniciar agente imediatamente ──────────────────────────────
+if "%INSTALL_AGENT%"=="true" (
     echo  [..] Iniciando agente...
     start "" /D "%PRODMON_DIR%" "%PYTHONW%" "%PRODMON_DIR%\prodmon_agent.py"
     timeout /t 2 >nul
-    echo  [OK] Agente rodando silenciosamente.
+    echo  [OK] Agente em execucao.
 )
 
-if "%INSTALL_DASHBOARD%"=="true" (
-    :: ── Criar script de execucao do Dashboard ─────────────────────
-    echo  [..] Criando atalhos do Dashboard...
-    set "VBS_DASH=%PRODMON_DIR%\start_dashboard.vbs"
-    echo Set WshShell = CreateObject^("WScript.Shell"^) > "!VBS_DASH!"
-    :: --server.address=127.0.0.1 restringe acesso ao localhost (segurança: evita exposicao na rede)
-    echo WshShell.Run "cmd.exe /c cd /d """%PRODMON_DIR%\dashboard""" ^& pip install -r requirements.txt ^& streamlit run app.py --server.address=127.0.0.1 --server.headless=true", 0, False >> "!VBS_DASH!"
-
-    set "LNK_DASH_DESKTOP=%PUBLIC%\Desktop\Abrir Dashboard ProdMon.lnk"
-    powershell -NoProfile -Command "$wshell = New-Object -ComObject WScript.Shell; $shortcut = $wshell.CreateShortcut('!LNK_DASH_DESKTOP!'); $shortcut.TargetPath = '!VBS_DASH!'; $shortcut.WorkingDirectory = '%PRODMON_DIR%'; $shortcut.Description = 'Abre o painel de BI do ProdMon'; $shortcut.Save()" >nul 2>&1
-    
-    echo  [OK] Atalho criado: Área de Trabalho Publica -> Abrir Dashboard ProdMon
-)
-
-:: ── Verificacao final e Ocultar pasta ─────────────────────────
+:: ── Conclusao ─────────────────────────────────────────────────
+cls
+color 0A
 echo.
-echo  ============================================================
-echo   Instalacao %INSTALL_MODE_TXT% Concluida com Sucesso
-echo   ============================================================
-echo   Pasta base    : %PRODMON_DIR%
-echo   Configuracoes : %PRODMON_DIR%\config.py (Operador: %OPERATOR_NAME%)
-echo   Python local  : %PYTHONW%
-
+echo  ╔══════════════════════════════════════════════════════════╗
+echo  ║              INSTALACAO CONCLUIDA COM SUCESSO!           ║
+echo  ╚══════════════════════════════════════════════════════════╝
+echo.
 if "%INSTALL_AGENT%"=="true" (
-    echo.
-    echo   [X] Agente (Rastreador) Instalado e em Execucao.
+    echo   [X] AGENTE DE MONITORAMENTO ATIVO
+    echo       Colaborador : !SAFE_NAME!
     if "!AUTOSTART!"=="true" (
-        echo       Configurado para iniciar com o Windows (autostart).
+        echo       Status      : Rodando e configurado para iniciar com o Windows
     ) else (
-        echo       Autostart desativado. Use atalho 'Iniciar ProdMon' na area de trabalho.
+        echo       Status      : Rodando agora. Use o atalho para iniciar nas proximas vezes.
     )
-)
-
-if "%INSTALL_DASHBOARD%"=="true" (
+    if "!DEBUG_MODE!"=="true" (
+        echo       Modo        : TESTE - janela de depuracao visivel na tela
+    ) else (
+        echo       Modo        : SILENCIOSO - invisivel para o usuario
+    )
     echo.
-    echo   [X] Dashboard (BI) Instalado.
-    echo       Use o atalho 'Abrir Dashboard ProdMon' na area de trabalho.
-    echo       (O primeiro uso pode demorar um pouco para instalar dependencias)
 )
-
+if "%INSTALL_DASHBOARD%"=="true" (
+    echo   [X] DASHBOARD BI INSTALADO
+    echo       Use o atalho "Abrir Dashboard ProdMon" na area de trabalho.
+    echo       (O primeiro acesso pode demorar alguns segundos)
+    echo.
+)
+echo   Pasta de rede : N:\MINAS CONTABILIDADE\SISTEMA - PRODMON
+echo   Pasta local   : C:\ProgramData\ProdMon
 echo.
-echo   PROXIMO PASSO: Edite o config.py e defina o caminho
-echo   de rede correto em "network_dir"
+echo  ╚══════════════════════════════════════════════════════════╝
 echo.
 pause
 exit /b 0
