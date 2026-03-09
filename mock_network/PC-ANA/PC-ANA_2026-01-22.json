@@ -1,0 +1,30 @@
+{
+  "operator_name": "Ana Souza",
+  "machine": "PC-ANA",
+  "username": "ana",
+  "date": "2026-01-22",
+  "version": "1.3",
+  "events": [
+    {
+      "type": "boot",
+      "timestamp": "2026-01-22T07:12:00"
+    },
+    {
+      "type": "active",
+      "start": "2026-01-22T07:12:00",
+      "end": "2026-01-22T15:21:18",
+      "duration_seconds": 29358
+    },
+    {
+      "type": "shutdown",
+      "timestamp": "2026-01-22T16:44:48.170679"
+    }
+  ],
+  "summary": {
+    "active_seconds": 29358,
+    "idle_seconds": 3630,
+    "locked_seconds": 1378,
+    "session_start": "2026-01-22T07:12:00",
+    "session_end": "2026-01-22T16:44:48.170679"
+  }
+}

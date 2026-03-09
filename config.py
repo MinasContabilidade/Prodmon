@@ -1,9 +1,11 @@
-[user]
 # Nome do operador desta máquina (preenchido durante a instalação)
 # Usado para identificar a pessoa nos relatórios e logs de produtividade
 operator_name = 
 
 [install]
+# Modo de instalacao na maquina: 'client' (so rastreador), 'server' (so dashboard) ou 'both'
+install_mode = 'client'
+
 # true  = Este script irá inicializar com o windows automaticamente, registrando os eventos
 # false = nao registra no startup; cria um launcher (start_prodmon.vbs) para iniciar manualmente
 autostart = true

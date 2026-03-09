@@ -1,0 +1,30 @@
+{
+  "operator_name": "Carlos TI",
+  "machine": "PC-CARLOS",
+  "username": "carlos",
+  "date": "2026-01-09",
+  "version": "1.3",
+  "events": [
+    {
+      "type": "boot",
+      "timestamp": "2026-01-09T08:00:00"
+    },
+    {
+      "type": "active",
+      "start": "2026-01-09T08:00:00",
+      "end": "2026-01-09T16:33:39",
+      "duration_seconds": 30819
+    },
+    {
+      "type": "shutdown",
+      "timestamp": "2026-01-09T18:00:00"
+    }
+  ],
+  "summary": {
+    "active_seconds": 30819,
+    "idle_seconds": 2642,
+    "locked_seconds": 2537,
+    "session_start": "2026-01-09T08:00:00",
+    "session_end": "2026-01-09T18:00:00"
+  }
+}
