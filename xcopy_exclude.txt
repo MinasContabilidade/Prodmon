@@ -1,6 +1,0 @@
-.git\
-dashboard_env\
-__pycache__\
-.gitignore
-mock_network\
-docs\

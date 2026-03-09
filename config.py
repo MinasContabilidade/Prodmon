@@ -21,7 +21,7 @@ local_dir = C:\ProgramData\ProdMon
 #   \\SERVIDOR\TI\ProdMon
 #   \\192.168.1.10\prodmon
 #   Z:\ProdMon
-network_dir = \\SERVIDOR\TI\ProdMon
+network_dir = N:\MINAS CONTABILIDADE\SISTEMA - PRODMON
 
 [settings]
 # Minutos de inatividade (sem mouse/teclado) para considerar ociosidade
